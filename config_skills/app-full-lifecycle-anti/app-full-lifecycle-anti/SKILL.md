@@ -1,95 +1,57 @@
 ---
 name: app-full-lifecycle-anti
-version: 1.1.0
-last_updated: 2026-07-15
-changelog: "v1.1.0 - Added QRC, updated frontmatter dependencies and trigger keywords per SkillAuditor."
+version: 1.2.0
+last_updated: 2026-07-22
+changelog: "v1.2.0 - Refactored to meta-skill (orchestrator). Removed hardcoded Dark theme to comply with new global SOP color rules."
 depends_on:
+  - SOP
   - app-blueprint-designer
   - frontend-design
   - ui-ux-pro-max
-description: "Kỹ năng toàn diện thực thi SOP 7 giai đoạn (workflow, app lifecycle) để xây dựng Web/App từ khâu ý tưởng, thiết kế Blueprint, đề xuất UI/UX, code, audit, cho đến triển khai production-ready. Triggers: SOP tạo app, web development process, full lifecycle."
+description: "Meta-skill điều phối toàn diện vòng đời phát triển Web/App. Kết hợp SOP gốc với các skill UI/UX để từ ý tưởng đến production-ready. Triggers: SOP tạo app, web development process, full lifecycle."
 ---
 
 # App Full Lifecycle (Anti) 🚀
 
-Kỹ năng này kết hợp sức mạnh từ `app-blueprint-designer`, `frontend-design`, và các quy tắc phát triển web hiện đại. Nó giúp em đồng hành cùng anh từ một ý tưởng thô sơ đến một sản phẩm hoàn chỉnh, production-ready với trải nghiệm cao cấp.
+Kỹ năng này hoạt động như một Meta-Skill, kết hợp sức mạnh từ `SOP` (Kỹ năng cốt lõi), `app-blueprint-designer`, `frontend-design`, và `ui-ux-pro-max` để đồng hành cùng anh từ một ý tưởng thô sơ đến một sản phẩm hoàn chỉnh.
 
-## Quy Trình 7 Giai Đoạn (SOP)
+## 🔄 Luồng Điều Phối (Orchestration Workflow)
 
-### Giai đoạn 1: Tiếp Nhận & Tối Ưu Ý Tưởng
-- **Mục tiêu:** Hiểu rõ ý tưởng ban đầu của anh và làm cho nó sắc bén, khả thi hơn.
-- **Hành động:** 
-  - Phân tích WHAT, WHO, WHY, HOW, WHEN.
-  - Gom các câu hỏi (tối đa 3 câu) để làm rõ Target User, Core Action, Scope.
-  - Tư vấn thêm các tính năng phù hợp để tối ưu ý tưởng.
-  - *Chờ anh phản hồi và chốt ý tưởng.*
+Thay vì định nghĩa lại quy trình từ đầu, skill này kích hoạt chuỗi 7 giai đoạn của kỹ năng `SOP` chuẩn, đồng thời **bơm thêm (inject)** các tác vụ nâng cao vào các giai đoạn cụ thể:
 
-### Giai đoạn 2: Lập Kế Hoạch & App Blueprint
-- **Mục tiêu:** Tạo bản thiết kế hệ thống (Blueprint) hoàn chỉnh trước khi code.
-- **Hành động:**
-  - Viết `blueprint.md` bao gồm: Vision, Problem Statement, Target Personas, Core User Journey, và MVP Feature Set (3-7 tính năng cốt lõi).
-  - *Đề xuất và chờ anh phê duyệt Blueprint.*
+### 1. Tại Giai đoạn 2 của SOP (Lên Kế Hoạch):
+- Tự động gọi tư duy của `app-blueprint-designer` để lập bản thiết kế Blueprint hoàn chỉnh (Vision, Problem Statement, Target Personas, Core User Journey, và MVP Feature Set).
 
-### Giai đoạn 3: Đề Xuất UI/UX & Design System
-- **Mục tiêu:** Định hình phong cách thiết kế mang tính cá nhân hoá cao, premium, tránh lối mòn templated.
-- **Hành động:**
-  - **Màu sắc:** Đề xuất bảng màu cụ thể (Hex code), ưu tiên Dark theme, Glassmorphism.
-  - **Typography:** Chọn các font hiện đại từ Google Fonts (Inter, Outfit, Roboto).
-  - **Visual:** Đề xuất micro-animations, hover effects, gradient.
-  - Trình bày Design System rõ ràng.
-  - *Chờ anh xác nhận giao diện và phong cách.*
+### 2. Tại Giai đoạn 3 của SOP (Design & Architecture):
+- **BẮT BUỘC tuân thủ luật màu sắc:** Ưu tiên sử dụng màu do người dùng yêu cầu hoặc truy xuất từ MCP. TUYỆT ĐỐI KHÔNG hardcode mặc định Dark Theme nếu chưa được phép.
+- Gọi tư duy của `frontend-design` để định hình triết lý thiết kế (Aesthetic Direction, Typography, Layout, Motion).
+- Gọi công cụ `ui-ux-pro-max` (bằng command-line) để lấy các token CSS cụ thể, bảng màu chuẩn, font pairing, và GSAP animation snippets. Trình bày Design System.
 
-### Giai đoạn 4: Xây Dựng & Code (Frontend First)
-- **Mục tiêu:** Hiện thực hóa bản thiết kế bằng code chất lượng cao.
-- **Hành động:**
-  - Tech stack: React, TypeScript, Vite, Vanilla CSS (Không dùng Tailwind trừ khi anh yêu cầu rõ).
-  - Code Clean, tuân thủ SOLID, DRY, naming có ý nghĩa.
-  - Không dùng placeholder cẩu thả; sử dụng tool tạo ảnh hoặc mock data chuyên nghiệp.
+### 3. Tại Giai đoạn 4 & 5 của SOP (Code & Audit):
+- Áp dụng các rules chi tiết từ `ui-ux-pro-max` để audit UI (Contrast, Accessibility, Touch & Interaction).
+- Code Clean, tuân thủ SOLID, DRY, naming có ý nghĩa (React, TS, Vite, Vanilla CSS).
+- Không dùng placeholder cẩu thả.
 
-### Giai đoạn 5: Audit & Đánh Giá (Chấm Điểm)
-- **Mục tiêu:** Đảm bảo sản phẩm đạt tiêu chuẩn chất lượng cao nhất.
-- **Hành động:**
-  - Tự động đánh giá giao diện, trải nghiệm (UX/UI), hiệu năng, SEO.
-  - Chấm điểm từng tiêu chí trên thang điểm 100.
-  - Với những tiêu chí điểm thấp hoặc chưa hoàn thiện, liệt kê chi tiết, đề xuất giải pháp cụ thể và tư vấn hướng khắc phục.
-  - *Gửi báo cáo Audit và chờ anh quyết định hướng xử lý.*
-
-### Giai đoạn 6: Hoàn Thiện & Tối Ưu
-- **Mục tiêu:** Xử lý các điểm yếu từ bước Audit và ráp nối logic hoàn chỉnh.
-- **Hành động:**
-  - Áp dụng các giải pháp đã được anh duyệt để nâng điểm Audit.
-  - Chạy test toàn diện (build + dev server + browser check) để đảm bảo không có lỗi.
-
-### Giai đoạn 7: Bàn Giao & Deploy
-- **Mục tiêu:** Đưa ứng dụng ra môi trường thực tế.
-- **Hành động:**
-  - Đóng gói ứng dụng gọn gàng.
-  - Cung cấp các lệnh deploy, hoặc hướng dẫn deploy lên Vercel/Netlify.
-  - Tạo artifact `walkthrough.md` tổng kết toàn bộ quá trình và thành tựu.
-
-## Quy Tắc Cốt Lõi Khi Thực Hiện
-1. Xưng hô "anh" - "em", giao tiếp bằng Tiếng Việt thân thiện, tôn trọng và chuyên nghiệp.
-2. Code luôn phải ở mức Production-ready, nói KHÔNG với code dummy hay basic.
-3. Ưu tiên mở rộng code hiện có hơn là đập đi viết lại.
-4. Luôn kiểm tra Knowledge Items (KI) và lịch sử trò chuyện trước khi bắt tay vào việc để bám sát context.
+## 🧠 QUY TẮC VÀNG (GOLDEN RULES)
+1. **DELEGATE, DON'T DUPLICATE:** Luôn sử dụng kỹ năng `SOP` làm xương sống. Skill này chỉ làm nhiệm vụ gắn thêm các module nâng cao.
+2. **USER COLORS ALWAYS WIN:** Tuyệt đối không tự ý quyết định phong cách/màu sắc (như mặc định Dark Theme) mà bỏ qua yêu cầu của người dùng/MCP.
+3. **PRODUCTION-READY:** Code, hình ảnh, văn bản (UX copy) đều phải đạt chuẩn thực tế, không dùng dummy/lorem ipsum.
 
 ---
 
-## ⚡ Quick Reference Card (QRC) v1.1.0
+## ⚡ Quick Reference Card (QRC) v1.2.0
 
 ```text
 ┌──────────────────────────────────────────────────────────────┐
-│       APP FULL LIFECYCLE (ANTI) – 7-STAGE SOP                │
+│       APP FULL LIFECYCLE (ANTI) – META ORCHESTRATOR          │
 ├──────────────────────────────────────────────────────────────┤
-│ 1. Ý TƯỞNG   : Hỏi đáp, làm rõ WHAT/WHO/WHY/HOW/WHEN (max 3) │
-│ 2. BLUEPRINT : Lập kế hoạch, Core Journey, MVP Features      │
-│ 3. UI/UX     : Đề xuất màu sắc (Dark theme), Font, Visual    │
-│ 4. CODE      : Frontend First (React, TS, Vite, Vanilla CSS) │
-│ 5. AUDIT     : Chấm điểm 100, rà soát UX/UI, SEO, Performance│
-│ 6. TỐI ƯU    : Sửa lỗi từ Audit, Build, Dev server check     │
-│ 7. BÀN GIAO  : Đóng gói, Hướng dẫn deploy, Tạo walkthrough   │
+│ 1. KÍCH HOẠT SOP: Sử dụng luồng 7 bước của SOP chuẩn.        │
+│ 2. INJECT P2    : Gọi app-blueprint-designer lập kế hoạch.   │
+│ 3. INJECT P3    : Gọi frontend-design & ui-ux-pro-max.       │
+│                   ⚠️ Chú ý: Tuân thủ tuyệt đối màu User/MCP. │
+│ 4. INJECT P4+P5 : Audit UI/UX khắt khe theo ui-ux-pro-max.   │
 ├──────────────────────────────────────────────────────────────┤
-│ ⚠️ RULE: Production-ready code, Tiếng Việt thân thiện, No    │
-│ dummy data, Luôn check KI trước khi làm.                     │
+│ ⚠️ RULE: Đây là Meta-skill, KHÔNG tự chế quy trình mới. Mọi  │
+│ quyết định màu sắc/theme phải bám sát SOP gốc.               │
 └──────────────────────────────────────────────────────────────┘
 ```
