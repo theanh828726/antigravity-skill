@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: vtf
+      POSTGRES_PASSWORD: vtf
+      POSTGRES_DB: vtf
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vtf"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  bot:
+    build: .
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+    volumes: [botdata:/app/data]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  botdata:
