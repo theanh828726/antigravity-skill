@@ -125,3 +125,18 @@ class ChatMessage(Base):
     role: Mapped[str] = mapped_column(String(12))
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProcessedMail(Base):
+    """Mỗi thư đến chỉ được xử lý tự động đúng một lần (khoá unique chống trùng khi khởi động lại)."""
+
+    __tablename__ = "processed_mail"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    message_id: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    sender: Mapped[str | None] = mapped_column(String(300))
+    subject: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="processing")
+    # processing/proposed/replied/no_action/failed/ignored
+    case_id: Mapped[int | None] = mapped_column(ForeignKey("cases.id"))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

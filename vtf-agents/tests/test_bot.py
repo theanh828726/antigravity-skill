@@ -36,6 +36,8 @@ def make_bot(settings, db, integ, llm):
     b.s, b.db, b.integ, b.orch = settings, db, integ, Orchestrator(llm)
     b.sess = FakeSession()
     b.bot = Bot("123:ABC", session=b.sess)
+    from vtf.core.mail_pipeline import MailPipeline
+    b.pipeline = MailPipeline(llm, settings, db.session, integ, b.notify)
     b.dp, b._locks = Dispatcher(), {}
     r = Router(); b._register(r); b.dp.include_router(r)
     return b
@@ -88,3 +90,35 @@ async def test_command_and_approval_buttons_end_to_end(settings, db, integ):
     await b.dp.feed_update(b.bot, Update(update_id=4, callback_query=CallbackQuery(
         id="c2", from_user=staff, chat_instance="ci", message=cb_msg, data=f"ap:{aid}:y")))
     assert len(integ.mail.sent) == 1
+
+
+async def test_auto_mail_buttons_and_redo_via_reply(settings, db, integ):
+    from test_auto_mail import draft_script, incoming
+    llm = ScriptedLLM(*draft_script("Bản 1"),
+                      reply(call("propose_reply", to="vp@bo.gov.vn", subject="Re: BC", body="Bản 2 ngắn",
+                                 request_summary="x", source_message_id="m1")), reply(text("xong")))
+    integ.mail.inbox.append(incoming())
+    b = make_bot(settings, db, integ, llm)
+    await b.pipeline.poll_once()
+
+    drafts = [d for n, d in b.sess.sent if "Dự thảo trả lời" in d.get("text", "")]
+    assert "Bản 1" in drafts[0]["text"] and "Cần bổ sung" in drafts[0]["text"]
+    btns = [x["callback_data"] for x in drafts[0]["reply_markup"]["inline_keyboard"][0]]
+    assert [c.split(":")[2] for c in btns] == ["y", "r", "n"]
+    aid = btns[0].split(":")[1]
+
+    owner = User(id=1, is_bot=False, first_name="T")
+    cb_msg = Message(message_id=50, date=dt.datetime.now(), chat=Chat(id=1, type="private"), text="x")
+    await b.dp.feed_update(b.bot, Update(update_id=10, callback_query=CallbackQuery(
+        id="c", from_user=owner, chat_instance="ci", message=cb_msg, data=f"ap:{aid}:r")))
+    prompt = b.sess.sent[-1][1]
+    assert f"Làm lại bản dự thảo #{aid}" in prompt["text"] and prompt["reply_markup"]["force_reply"]
+
+    # anh trả lời đúng tin nhắn nhắc → hệ thống làm lại
+    prompt_msg = Message(message_id=60, date=dt.datetime.now(), chat=Chat(id=1, type="private"), text=prompt["text"])
+    upd = Update(update_id=11, message=Message(message_id=61, date=dt.datetime.now(), chat=Chat(id=1, type="private"),
+                  from_user=owner, text="Ngắn hơn", reply_to_message=prompt_msg))
+    await b.dp.feed_update(b.bot, upd)
+    newest = [d for n, d in b.sess.sent if "Dự thảo trả lời" in d.get("text", "")][-1]
+    assert "Bản 2 ngắn" in newest["text"] and "v2" in newest["text"]
+    assert integ.mail.sent == []

@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     google_calendar_id: str = "primary"
     google_drive_folder_id: str = ""
 
+    auto_mail_enabled: bool = True
+    mail_poll_seconds: int = 120
+    max_revisions: int = 5
     reminder_interval_seconds: int = 60
     reminder_lead_hours: int = 24
     timezone: str = "Asia/Ho_Chi_Minh"

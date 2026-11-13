@@ -24,6 +24,14 @@ HV / SK / TT chưa kích hoạt: TQ báo đúng như vậy thay vì tự làm th
 Chưa điền khóa Google thì Gmail/Calendar/Drive chạy **mock trong bộ nhớ** (log ghi `Tích hợp Google: mock`);
 điền `GOOGLE_*` để dùng thật. Refresh token cần các scope: `gmail.readonly`, `gmail.compose`, `calendar`, `drive.readonly`.
 
+## Tự động hoá thư đến
+Bot quét hộp thư mỗi `MAIL_POLL_SECONDS` (mặc định 120s). Với mỗi thư mới, agent tự: đọc → phân loại → (nếu cần phản hồi)
+lập hồ sơ HS-…, tạo việc theo hạn, tra điều lệ trong kho tài liệu → soạn dự thảo trả lời → gửi lên Telegram:
+
+`✅ Duyệt & gửi` · `🔁 Làm lại` (anh trả lời tin nhắn nhắc bằng góp ý; ra bản mới v2, v3…, tối đa `MAX_REVISIONS`) · `❌ Từ chối`
+(sau khi từ chối vẫn có nút làm lại). Thư chỉ đi sau khi Duyệt, và gửi đúng luồng thư gốc. Thư thông báo/quảng cáo/tự động
+được ghi nhận "không cần phản hồi" và báo nhẹ, không làm phiền. Mỗi thư chỉ xử lý một lần. Tắt bằng `AUTO_MAIL_ENABLED=false`.
+
 ## Lệnh Telegram
 `/cases` `/tasks` `/pending` `/case HS-…` `/agents` `/reset`; gửi PDF/TXT/MD để lưu và lập chỉ mục.
 

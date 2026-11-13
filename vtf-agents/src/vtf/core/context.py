@@ -21,6 +21,7 @@ class Ctx:
     user_id: int = 0
     role: str = "owner"  # owner | staff
     pending_approval_ids: list[int] = field(default_factory=list)  # bot sẽ hiện nút Duyệt
+    extra: dict = field(default_factory=dict)  # trạng thái riêng của luồng tự động (revision, thư gốc...)
 
     @property
     def tz(self) -> ZoneInfo:

@@ -4,11 +4,12 @@ import asyncio
 import datetime as dt
 import html
 import logging
+import re
 import uuid
 
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, CommandStart
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import CallbackQuery, ForceReply, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram.utils.chat_action import ChatActionSender
 from sqlalchemy import select
 
@@ -16,6 +17,7 @@ from ..config import Settings
 from ..core import knowledge
 from ..core.approvals import decide
 from ..core.context import Ctx
+from ..core.mail_pipeline import MailPipeline
 from ..core.orchestrator import Orchestrator
 from ..core.store import add_evidence
 from ..db.models import Approval, Case, Document, Task
@@ -43,17 +45,38 @@ def _chunks(text: str) -> list[str]:
     return [text[i:i + TG_LIMIT] for i in range(0, len(text), TG_LIMIT)] or [""]
 
 
-def approval_kb(approval_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Duyệt", callback_data=f"ap:{approval_id}:y"),
-        InlineKeyboardButton(text="❌ Từ chối", callback_data=f"ap:{approval_id}:n"),
-    ]])
+REVISABLE = {"send_reply"}
+REVISE_PROMPT = "🔁 Làm lại bản dự thảo #"
+_REVISE_RE = re.compile(r"Làm lại bản dự thảo #(\d+)")
+
+
+def approval_kb(approval_id: int, revisable: bool = False) -> InlineKeyboardMarkup:
+    row = [InlineKeyboardButton(text="✅ Duyệt & gửi" if revisable else "✅ Duyệt", callback_data=f"ap:{approval_id}:y")]
+    if revisable:
+        row.append(InlineKeyboardButton(text="🔁 Làm lại", callback_data=f"ap:{approval_id}:r"))
+    row.append(InlineKeyboardButton(text="❌ Từ chối", callback_data=f"ap:{approval_id}:n"))
+    return InlineKeyboardMarkup(inline_keyboard=[row])
+
+
+def render_approval(a: Approval) -> str:
+    """Nội dung yêu cầu duyệt; dự thảo thư hiển thị đầy đủ để anh đọc ngay trên Telegram."""
+    p = a.payload or {}
+    if a.action != "send_reply":
+        return f"<b>Yêu cầu duyệt #{a.id}</b> ({a.agent})\n{html.escape(a.summary)}"
+    lines = [f"<b>✍️ Dự thảo trả lời #{a.id} · v{p.get('revision', 1)}</b>",
+             f"Yêu cầu của thư đến: {html.escape(p.get('request_summary', ''))}",
+             f"Tới: {html.escape(p['to'])}", f"Tiêu đề: {html.escape(p['subject'])}", "",
+             html.escape(p["body"])]
+    if p.get("open_points"):
+        lines += ["", "⚠️ <b>Cần bổ sung trước khi gửi:</b>"] + [f"• {html.escape(x)}" for x in p["open_points"]]
+    return "\n".join(lines)
 
 
 class VtfBot:
     def __init__(self, s: Settings, db: Database, integrations: Integrations, orch: Orchestrator):
         self.s, self.db, self.integ, self.orch = s, db, integrations, orch
         self.bot = Bot(s.telegram_bot_token)
+        self.pipeline = MailPipeline(orch.llm, s, db.session, integrations, self.notify)
         self.dp = Dispatcher()
         self._locks: dict[int, asyncio.Lock] = {}
         r = Router()
@@ -81,9 +104,16 @@ class VtfBot:
         async with self.db.session() as s:
             rows = (await s.scalars(select(Approval).where(Approval.id.in_(ids)))).all()
         for a in rows:
-            await self.bot.send_message(
-                chat_id, f"<b>Yêu cầu duyệt #{a.id}</b> ({a.agent})\n{html.escape(a.summary)}",
-                parse_mode="HTML", reply_markup=approval_kb(a.id))
+            parts = _chunks(render_approval(a))
+            for i, part in enumerate(parts):  # nút gắn vào đoạn cuối
+                await self.bot.send_message(chat_id, part, parse_mode="HTML",
+                                            reply_markup=approval_kb(a.id, a.action in REVISABLE)
+                                            if i == len(parts) - 1 else None)
+
+    async def notify(self, chat_id: int, approval_ids: list[int], text: str) -> None:
+        """Gọi từ luồng tự động: báo tóm tắt rồi gửi từng dự thảo kèm nút."""
+        await self.bot.send_message(chat_id, text, parse_mode="HTML", disable_notification=not approval_ids)
+        await self._send_approvals(chat_id, approval_ids)
 
     # ---------- handlers ----------
     def _register(self, r: Router) -> None:
@@ -163,7 +193,12 @@ class VtfBot:
         @r.message(F.text)
         @authorized
         async def text(m: Message, role: str):
-            await self._ask(m, role, m.text)
+            prompt = m.reply_to_message.text if m.reply_to_message else None
+            hit = _REVISE_RE.search(prompt or "")
+            if hit:
+                await self._revise(m, role, int(hit.group(1)))
+            else:
+                await self._ask(m, role, m.text)
 
         @r.callback_query(F.data.startswith("ap:"))
         async def approval_cb(cb: CallbackQuery):
@@ -173,11 +208,29 @@ class VtfBot:
                 return
             _, sid, choice = cb.data.split(":")
             ctx = self.ctx(cb.message.chat.id, cb.from_user.id, role)
+            if choice == "r":
+                if role != "owner":
+                    await cb.answer("Chỉ Grand Master mới có quyền yêu cầu làm lại.", show_alert=True)
+                    return
+                await cb.answer()
+                await cb.message.edit_reply_markup(reply_markup=None)
+                await cb.message.answer(
+                    f"{REVISE_PROMPT}{sid}\nAnh <b>trả lời tin nhắn này</b> bằng góp ý chỉnh sửa "
+                    "(vd: ngắn gọn hơn, nhấn mạnh hạn 20/12, bỏ đoạn 2). Gửi dấu <code>.</code> nếu để em tự cải thiện.",
+                    parse_mode="HTML", reply_markup=ForceReply(selective=True, input_field_placeholder="Góp ý chỉnh sửa..."))
+                return
             status, msg = await decide(ctx, int(sid), choice == "y")
             await cb.answer(msg[:190], show_alert=status == "denied")
             if status != "denied":
                 await cb.message.edit_reply_markup(reply_markup=None)
-                await cb.message.answer(html.escape(msg), parse_mode="HTML")
+                extra = None
+                if status == "rejected":  # cho phép làm lại sau khi từ chối
+                    async with self.db.session() as s:
+                        a = await s.get(Approval, int(sid))
+                    if a and a.action in REVISABLE:
+                        extra = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(
+                            text="🔁 Làm lại bản khác", callback_data=f"ap:{sid}:r")]])
+                await cb.message.answer(html.escape(msg), parse_mode="HTML", reply_markup=extra)
 
     async def _ask(self, m: Message, role: str, text: str) -> None:
         lock = self._locks.setdefault(m.chat.id, asyncio.Lock())  # tuần tự hoá theo chat
@@ -191,6 +244,37 @@ class VtfBot:
                 reply = f"Em gặp lỗi khi xử lý (mã {ref}). Anh thử lại giúp em, hoặc báo mã này cho kỹ thuật."
         await self._send(m.chat.id, reply)
         await self._send_approvals(m.chat.id, ctx.pending_approval_ids)
+
+    async def _revise(self, m: Message, role: str, approval_id: int) -> None:
+        if role != "owner":
+            await m.answer("Chỉ Grand Master mới có quyền yêu cầu làm lại.")
+            return
+        feedback = (m.text or "").strip()
+        if feedback in (".", ""):
+            feedback = "Cải thiện: rõ ràng, trang trọng, đúng trọng tâm; giữ nguyên các ý đã đúng."
+        lock = self._locks.setdefault(m.chat.id, asyncio.Lock())
+        async with lock, ChatActionSender.typing(bot=self.bot, chat_id=m.chat.id):
+            try:
+                new_ids = await self.pipeline.revise(approval_id, feedback)
+            except ValueError as e:
+                await m.answer(str(e))
+                return
+        if not new_ids:
+            await m.answer(f"Em chưa làm lại được bản #{approval_id}; bản cũ vẫn giữ nguyên, anh có thể Duyệt hoặc thử lại.")
+            await self._send_approvals(m.chat.id, [approval_id])
+            return
+        await m.answer("Em đã sửa theo góp ý, mời anh xem bản mới:")
+        await self._send_approvals(m.chat.id, new_ids)
+
+    async def mail_loop(self) -> None:
+        while True:
+            try:
+                n = await self.pipeline.poll_once()
+                if n:
+                    log.info("Đã xử lý %s thư mới", n)
+            except Exception:
+                log.exception("Lỗi vòng quét thư")
+            await asyncio.sleep(self.s.mail_poll_seconds)
 
     async def _upload(self, m: Message, role: str) -> None:
         doc = m.document
@@ -249,11 +333,14 @@ class VtfBot:
 
     async def run(self) -> None:
         await self.db.create_all()
-        reminder = asyncio.create_task(self.reminder_loop())
+        tasks = [asyncio.create_task(self.reminder_loop())]
+        if self.s.auto_mail_enabled:
+            tasks.append(asyncio.create_task(self.mail_loop()))
         try:
             await self.dp.start_polling(self.bot)
         finally:
-            reminder.cancel()
+            for t in tasks:
+                t.cancel()
             await self.bot.session.close()
 
 
