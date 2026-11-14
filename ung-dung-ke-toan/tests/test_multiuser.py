@@ -103,3 +103,12 @@ def test_pg_backup_and_restore_roundtrip(pg_users, tmp_path):
     bk.restore(f)
     assert a.db.scalar("SELECT COUNT(*) FROM voucher") == n
     assert a.db.scalar("SELECT COUNT(*) FROM audit_log WHERE action='Khôi phục dữ liệu'") == 1
+
+
+def test_benign_restore_error_filter():
+    from ketoan.data.db import PostgresDatabase as P
+    benign = ('pg_restore: error: could not execute query: ERROR:  unrecognized configuration parameter "transaction_timeout"\n'
+              'Command was: SET transaction_timeout = 0;\npg_restore: warning: errors ignored on restore: 1')
+    assert P.only_benign_restore_errors(benign)                                          # PG 17 → 16: lỗi vô hại
+    assert not P.only_benign_restore_errors(benign + '\npg_restore: error: relation "x" does not exist')
+    assert not P.only_benign_restore_errors("pg_restore: error: connection to server failed")

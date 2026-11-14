@@ -234,6 +234,9 @@ class Database(BaseDatabase):
         except sqlite3.Error:
             return False
 
+    def clone(self):
+        return Database(self.path)
+
     def init_schema(self):
         self.conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
         with self.transaction():
@@ -455,8 +458,25 @@ class PostgresDatabase(BaseDatabase):
                                env=self._env(), capture_output=True, text=True)
         finally:
             self.open()
-        if r.returncode:
+        if r.returncode and not self.only_benign_restore_errors(r.stderr):
             raise DatabaseError(f"pg_restore lỗi: {r.stderr.strip()[:400]}")
+
+    @staticmethod
+    def only_benign_restore_errors(stderr: str) -> bool:
+        """pg_restore bản mới hơn máy chủ có thể báo lỗi vô hại khi áp dụng tham số chỉ có ở bản mới (vd transaction_timeout, PG 17 → 16).
+        Chỉ coi là thành công khi MỌI lỗi đều thuộc loại này."""
+        errors = re.findall(r"pg_restore: error: (.*)", stderr)
+        return bool(errors) and all("unrecognized configuration parameter" in e and
+                                    re.search(r"transaction_timeout|idle_session_timeout|default_table_access_method", e + stderr) for e in errors)
+
+    def clone(self):
+        """Kết nối mới tới cùng CSDL (cùng thông tin đăng nhập, kể cả mật khẩu chỉ giữ trong bộ nhớ)."""
+        c = PostgresDatabase.__new__(PostgresDatabase)
+        BaseDatabase.__init__(c)
+        import psycopg
+        c._psycopg, c.errors, c.params, c.path = psycopg, (psycopg.Error,), dict(self.params), self.path
+        c.open()
+        return c
 
     def validate_dump(self, source: str | Path):
         r = subprocess.run([self._tool("pg_restore"), "-l", str(source)], env=self._env(), capture_output=True, text=True)

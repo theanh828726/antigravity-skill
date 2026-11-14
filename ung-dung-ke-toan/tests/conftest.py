@@ -64,7 +64,7 @@ def factory(backend, templates, tmp_path):
 
     def make(company_id=1, username="admin", password="admin@123", same_db_as=None):
         if same_db_as is not None:                                  # kết nối thứ hai tới cùng CSDL (kiểm thử đa người dùng)
-            db = PostgresDatabase(same_db_as.db.path) if backend == "pg" else Database(same_db_as.db.path)
+            db = same_db_as.db.clone()
         elif backend == "sqlite":
             p = tmp_path / f"work_{len(opened)}.db"
             shutil.copy(templates["sqlite"], p)
