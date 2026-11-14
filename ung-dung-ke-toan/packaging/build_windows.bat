@@ -28,6 +28,7 @@ echo [5/5] Kem du lieu mau va tai lieu ...
 if not exist dist\UngDungKeToan\sample_data mkdir dist\UngDungKeToan\sample_data
 python -c "from ketoan.data.seed import create_database; create_database(r'dist\UngDungKeToan\sample_data\ketoan_demo.db').close()"
 copy /y docs\HUONG_DAN_CAI_DAT.md dist\UngDungKeToan\ >nul
+xcopy /e /i /y sample_data\hoa_don_xml dist\UngDungKeToan\sample_data\hoa_don_xml >nul
 
 echo.
 echo Hoan tat: dist\UngDungKeToan\UngDungKeToan.exe

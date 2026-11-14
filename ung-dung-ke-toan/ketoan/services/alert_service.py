@@ -5,10 +5,9 @@ Mỗi cảnh báo có: mức độ, nhóm, nguyên nhân, số chênh lệch, ch
 """
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass
 
-from ketoan.domain.constants import INVENTORY_PREFIXES, POSTED, SEV_BLOCK, SEV_INFO, SEV_REVIEW
+from ketoan.domain.constants import POSTED, SEV_BLOCK, SEV_INFO, SEV_REVIEW
 from ketoan.domain.money import to_decimal
 from ketoan.services.context import Session
 from ketoan.services.voucher_service import VoucherService
@@ -34,6 +33,9 @@ RULE_GROUP = {
     "ngoai_nam": "Ngày hạch toán ngoài năm tài chính",
     "so_du_dau_ky": "Số dư đầu kỳ",
     "chua_ghi_so": "Chứng từ chưa ghi sổ",
+    "quy_am": "Tồn quỹ tiền mặt âm",
+    "gia_xuat": "Giá xuất kho chưa tính",
+    "ban_chua_xuat": "Bán hàng chưa xuất kho / chưa ghi giá vốn",
 }
 
 
@@ -63,6 +65,8 @@ class AlertService:
         alerts += self._voucher_checks(d_from, d_to)
         alerts += self._ledger_integrity(d_from, d_to)
         alerts += self._negative_stock(d_to)
+        alerts += self._negative_cash(d_from, d_to)
+        alerts += self._stock_checks(d_from, d_to)
         alerts += self._abnormal_debt(d_to)
         alerts += self._opening_balance(int(d_from[:4]))
         order = {SEV_BLOCK: 0, SEV_REVIEW: 1, SEV_INFO: 2}
@@ -121,31 +125,64 @@ class AlertService:
                              tot["d"] - tot["cr"], None, "", ("trial_balance",)))
         return out
 
-    # ------------------------------------------------------------ tồn kho âm
+    # ------------------------------------------------------------ tồn kho âm (có tính tồn đầu kỳ)
     def _negative_stock(self, d_to):
-        c = self.s.company_id
-        bal: dict[tuple, object] = defaultdict(lambda: to_decimal(0))
+        from ketoan.services.inventory_service import InventoryService
+        inv = InventoryService(self.s)
+        year = int(d_to[:4])
+        bal = {k: v[0] for k, v in inv.opening(f"{year}-01-01").items()}
+        names = {r["id"]: r for r in self.db.query("SELECT id, code, name FROM item WHERE company_id=?", (self.s.company_id,))}
+        whs = {r["id"]: r["code"] for r in self.db.query("SELECT id, code FROM warehouse WHERE company_id=?", (self.s.company_id,))}
         flagged = {}
-        rows = self.db.query("""SELECT e.item_id, e.warehouse_id, e.quantity, e.debit, e.credit, e.voucher_id, e.posting_date,
-                                       v.number, i.code icode, i.name iname, w.code wcode, e.account_code
-                                FROM ledger_entry e JOIN voucher v ON v.id=e.voucher_id
-                                JOIN item i ON i.id=e.item_id LEFT JOIN warehouse w ON w.id=e.warehouse_id
-                                WHERE e.company_id=? AND e.item_id IS NOT NULL AND e.is_tax=0 AND e.posting_date<=?
-                                ORDER BY e.posting_date, (e.debit=0), e.id""", (c, d_to))
-        for r in rows:
-            if not r["account_code"].startswith(INVENTORY_PREFIXES):
-                continue
-            key = (r["item_id"], r["warehouse_id"])
-            q = to_decimal(r["quantity"])
-            bal[key] += q if r["debit"] else -q
-            if bal[key] < 0 and key not in flagged:
-                flagged[key] = r
+        for m in inv.movements(f"{year}-01-01", d_to):
+            k = (m["item_id"], m["warehouse_id"])
+            q = to_decimal(m["quantity"])
+            bal[k] = bal.get(k, to_decimal(0)) + (q if m["debit"] else -q)
+            if bal[k] < 0 and k not in flagged:
+                flagged[k] = m
         out = []
-        for key, r in flagged.items():
+        for k, m in flagged.items():
+            it = names.get(k[0])
             out.append(Alert(SEV_REVIEW, "ton_am",
-                             f"Hàng {r['icode']} – {r['iname']} tại kho {r['wcode'] or '(chưa chọn)'} bị âm từ ngày "
-                             f"{r['posting_date']}; tồn hiện tại {bal[key].normalize()} (chưa tính số lượng tồn đầu năm – GĐ2)",
-                             0, r["voucher_id"], f"{r['number']} ({r['posting_date']})", ("voucher", r["voucher_id"])))
+                             f"Hàng {it['code'] if it else '?'} – {it['name'] if it else ''} tại kho {whs.get(k[1], '(chưa chọn)')} "
+                             f"bị âm từ ngày {m['posting_date']}; tồn đến {d_to}: {bal[k].normalize()}",
+                             0, m["voucher_id"], f"{m['number']} ({m['posting_date']})", ("voucher", m["voucher_id"])))
+        return out
+
+    # ------------------------------------------------------------ tồn quỹ tiền mặt âm
+    def _negative_cash(self, d_from, d_to):
+        from ketoan.services.ledger_service import LedgerService
+        out = []
+        for acc in [r["code"] for r in self.db.query("SELECT code FROM account WHERE company_id=? AND code LIKE '111%' "
+                                                     "AND is_detail=1", (self.s.company_id,))]:
+            d = LedgerService(self.s).account_detail(acc, d_from, d_to)
+            first = next((r for r in d["rows"] if r["balance"] < 0), None)
+            if first:
+                out.append(Alert(SEV_REVIEW, "quy_am", f"Tồn quỹ TK {acc} âm {-first['balance']:,} từ ngày {first['posting_date']} "
+                                 "– kiểm tra thứ tự / thiếu chứng từ thu".replace(",", "."), first["balance"],
+                                 first["voucher_id"], f"{first['number']} ({first['posting_date']})",
+                                 ("voucher", first["voucher_id"])))
+        return out
+
+    # ------------------------------------------------------------ kho – bán hàng
+    def _stock_checks(self, d_from, d_to):
+        from ketoan.services.inventory_service import InventoryService
+        from ketoan.services.trade_service import TradeService
+        out = []
+        for acc, stock, ob, diff in InventoryService(self.s).opening_vs_ledger(int(d_from[:4])):
+            if diff:
+                out.append(Alert(SEV_REVIEW, "lech_tong_hop_chi_tiet",
+                                 f"Tồn kho đầu kỳ chi tiết TK {acc} ({stock:,}) khác số dư đầu năm ({ob:,})".replace(",", "."),
+                                 diff, None, "", ("opening_stock",)))
+        for r in InventoryService(self.s).nxt(f"{d_to[:4]}-01-01", d_to):
+            if r.cb_q == 0 and r.cb_v != 0:
+                out.append(Alert(SEV_REVIEW, "gia_xuat", f"Hàng {r.item_code} tại kho {r.warehouse_code} hết số lượng nhưng còn "
+                                 f"giá trị {r.cb_v:,} – chạy «Tính giá xuất kho» cho các tháng chưa khóa".replace(",", "."),
+                                 r.cb_v, None, "", ("costing",)))
+        for p in TradeService(self.s).sale_without_cogs(d_from, d_to):
+            out.append(Alert(SEV_REVIEW, "ban_chua_xuat", "Bảng kê bán hàng đã ghi sổ có hàng tồn kho nhưng chưa có phiếu xuất "
+                             "kho / giá vốn – dùng «Xuất kho hàng loạt»", 0, p["id"],
+                             f"{p['number']} ({p['posting_date']})", ("voucher", p["id"])))
         return out
 
     # ------------------------------------------------------------ công nợ bất thường

@@ -201,11 +201,10 @@ class MainWindow(QMainWindow):
         lay.addWidget(self.b_refresh, 0, Qt.AlignBottom)
         self.b_cost = QPushButton("Tính giá xuất kho")
         self.b_cost.setObjectName("CtlButton")
-        self.b_cost.setIcon(icons.icon("calc", "#9AA6B4", 15))
-        self.b_cost.setEnabled(False)
-        self.b_cost.setToolTip("CHƯA TRIỂN KHAI – Giai đoạn 2.\nDự kiến: bình quân gia quyền cuối kỳ, bình quân tức thời, "
-                               "nhập trước – xuất trước; mỗi phương pháp sẽ ghi rõ phạm vi hỗ trợ.\n"
-                               "Giai đoạn 1: đơn giá xuất kho nhập tay trên phiếu xuất.")
+        self.b_cost.setIcon(icons.icon("calc", "#2B4A6F", 15))
+        self.b_cost.setToolTip("Tính giá xuất kho theo phương pháp của doanh nghiệp (bình quân gia quyền cuối tháng / FIFO) – "
+                               "có bảng xem trước")
+        self.b_cost.clicked.connect(lambda: self.open("m_tinhgia"))
         lay.addWidget(self.b_cost, 0, Qt.AlignBottom)
         self.b_close = QPushButton("Kết chuyển")
         self.b_close.setObjectName("CtlButton")
@@ -520,6 +519,10 @@ class MainWindow(QMainWindow):
             from ketoan.ui.system_views import ClosingDialog
             ClosingDialog(self, self).exec()
             return None
+        if key == "m_tinhgia":
+            from ketoan.ui.phase2_views import CostingDialog
+            CostingDialog(self, self).exec()
+            return None
         if key == "m_nhquy":
             idx = next(i for i, m in enumerate(MENU) if m[0] == "Ngân hàng – Quỹ")
             self.sidebar.select(idx)
@@ -539,7 +542,7 @@ class MainWindow(QMainWindow):
             error(self, "Chức năng dành cho quản trị hệ thống.", "Không có quyền")
             return None
         title = func.title if func else key
-        if func and func.phase > 1:
+        if func and func.pending:
             return self._add_tab(tab_key, PhaseView(func), title, func.icon)
         w = self._create(key, args)
         if w is None:
@@ -573,6 +576,19 @@ class MainWindow(QMainWindow):
             return cv.CatalogView(self, args.get("catalog", "account"))
         if key == "c_opening":
             return cv.OpeningBalanceView(self)
+        from ketoan.ui import phase2_views as p2
+        if key == "m_congno":
+            return p2.DebtView(self, args.get("account", "131"))
+        if key in ("m_htk", "m_thekho"):
+            return p2.InventoryView(self, 1 if key == "m_thekho" else 0)
+        if key == "c_opening_stock":
+            return p2.OpeningStockView(self)
+        if key == "m_xuatloat":
+            return p2.BatchIssueView(self)
+        if key == "m_dtgv":
+            return p2.RevenueCogsView(self)
+        if key == "c_import_xml":
+            return p2.XmlInvoiceView(self)
         if key == "s_alerts":
             return sv.AlertView(self)
         if key == "s_lock":

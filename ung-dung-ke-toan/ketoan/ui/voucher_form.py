@@ -302,6 +302,10 @@ class VoucherForm(QWidget):
         self.ed_inv_no = QLineEdit()
         self.ed_inv_series = QLineEdit()
         self.ed_inv_date = DateEdit()
+        self.ed_due = DateEdit()
+        self.ed_due.setToolTip("Hạn thanh toán – mặc định = ngày hóa đơn + số ngày hạn TT của đối tượng; dùng cho tuổi nợ")
+        self._due_touched = False
+        self.ed_due.dateChanged.connect(lambda _: (not self._loading) and setattr(self, "_due_touched", True))
         lab = lambda t: QLabel(t)
         g.addWidget(lab("Loại chứng từ"), 0, 0); g.addWidget(self.cb_type, 0, 1)
         g.addWidget(lab("Số chứng từ"), 0, 2); g.addWidget(self.ed_number, 0, 3)
@@ -309,18 +313,28 @@ class VoucherForm(QWidget):
         g.addWidget(lab("Ngày hạch toán"), 0, 6); g.addWidget(self.ed_pdate, 0, 7)
         g.addWidget(lab("Đối tượng"), 1, 0); g.addWidget(self.partner, 1, 1, 1, 3)
         g.addWidget(lab("Mã số thuế"), 1, 4); g.addWidget(self.ed_tax, 1, 5)
-        self.lab_inv = [lab("Số hóa đơn"), lab("Ký hiệu"), lab("Ngày hóa đơn")]
-        g.addWidget(self.lab_inv[0], 1, 6); g.addWidget(self.ed_inv_no, 1, 7)
+        self.lab_inv = [lab("Ký hiệu / Số HĐ"), lab("Ngày hóa đơn"), lab("Hạn thanh toán")]
+        inv_box = QWidget()
+        ib = QHBoxLayout(inv_box)
+        ib.setContentsMargins(0, 0, 0, 0)
+        ib.setSpacing(4)
+        self.ed_inv_series.setPlaceholderText("Ký hiệu")
+        self.ed_inv_no.setPlaceholderText("Số hóa đơn")
+        ib.addWidget(self.ed_inv_series, 1)
+        ib.addWidget(self.ed_inv_no, 1)
+        self.inv_box = inv_box
+        g.addWidget(self.lab_inv[0], 1, 6); g.addWidget(inv_box, 1, 7)
         g.addWidget(lab("Diễn giải"), 2, 0); g.addWidget(self.ed_desc, 2, 1, 1, 3)
-        g.addWidget(self.lab_inv[1], 2, 4); g.addWidget(self.ed_inv_series, 2, 5)
-        g.addWidget(self.lab_inv[2], 2, 6); g.addWidget(self.ed_inv_date, 2, 7)
+        g.addWidget(self.lab_inv[1], 2, 4); g.addWidget(self.ed_inv_date, 2, 5)
+        g.addWidget(self.lab_inv[2], 2, 6); g.addWidget(self.ed_due, 2, 7)
         for c, st in ((1, 2), (3, 1), (5, 1), (7, 1)):
             g.setColumnStretch(c, st)
         root.addWidget(box)
         for w in (self.ed_number, self.ed_tax, self.ed_desc, self.ed_inv_no, self.ed_inv_series):
             w.textEdited.connect(self._mark_dirty)
-        for w in (self.ed_vdate, self.ed_pdate, self.ed_inv_date):
+        for w in (self.ed_vdate, self.ed_pdate, self.ed_inv_date, self.ed_due):
             w.dateChanged.connect(self._mark_dirty)
+        self.ed_inv_date.dateChanged.connect(lambda _: self._suggest_due())
 
         # Thanh công cụ lưới
         gbar = QHBoxLayout()
@@ -388,7 +402,7 @@ class VoucherForm(QWidget):
         for j, c in enumerate(self.columns):
             self.grid.setColumnWidth(j, c[2])
         has_inv = bool(self.vt.tax_account) or self.vtype == "PKMB"
-        for w in self.lab_inv + [self.ed_inv_no, self.ed_inv_series, self.ed_inv_date]:
+        for w in self.lab_inv + [self.inv_box, self.ed_inv_date, self.ed_due]:
             w.setVisible(has_inv)
         self.hint.setText(self.vt.note or "Chỉ hiển thị các cột phù hợp loại chứng từ. Enter: sang ô kế tiếp.")
 
@@ -409,6 +423,8 @@ class VoucherForm(QWidget):
         self.ed_vdate.set_iso(default)
         self.ed_pdate.set_iso(default)
         self.ed_inv_date.set_iso(default)
+        self.ed_due.set_iso(default)
+        self._due_touched = False
         self.partner.set_value("", "")
         for w in (self.ed_tax, self.ed_desc, self.ed_inv_no, self.ed_inv_series):
             w.setText("")
@@ -433,6 +449,8 @@ class VoucherForm(QWidget):
         self.ed_vdate.set_iso(v["voucher_date"])
         self.ed_pdate.set_iso(v["posting_date"])
         self.ed_inv_date.set_iso(v["invoice_date"] or v["voucher_date"])
+        self.ed_due.set_iso(v.get("due_date") or v["invoice_date"] or v["voucher_date"])
+        self._due_touched = bool(v.get("due_date"))
         pname = v["partner_name"] or (self.lookup.find("partner", v["partner_code"]) or (0, 0, ""))[2]
         self.partner.set_value(v["partner_code"], pname)
         self.ed_tax.setText(v["tax_code"] or "")
@@ -479,9 +497,21 @@ class VoucherForm(QWidget):
         self.render()
         self._update_title()
 
+    def _suggest_due(self):
+        """Gợi ý hạn thanh toán = ngày hóa đơn + số ngày hạn TT của đối tượng (khi người dùng chưa tự sửa)."""
+        if self._loading or self._due_touched or not self.partner.code():
+            return
+        hit = self.lookup.find("partner", self.partner.code())
+        if hit:
+            due = self.vs.default_due_date(hit[0], self.ed_inv_date.iso())
+            self._loading = True
+            self.ed_due.set_iso(due)
+            self._loading = False
+
     def _partner_changed(self, hit):
         if self._loading:
             return
+        self._suggest_due()
         if hit:
             self.ed_tax.setText(hit[3] or "")
             # gợi ý đối tượng cho các dòng có TK bắt buộc đối tượng nhưng chưa chọn
@@ -507,7 +537,7 @@ class VoucherForm(QWidget):
         locked = st in (POSTED, LOCKED)
         for w in (self.ed_number, self.ed_tax, self.ed_desc, self.ed_inv_no, self.ed_inv_series):
             w.setReadOnly(not on)
-        for w in (self.ed_vdate, self.ed_pdate, self.ed_inv_date):
+        for w in (self.ed_vdate, self.ed_pdate, self.ed_inv_date, self.ed_due):
             w.setReadOnly(not on)
         self.partner.set_readonly(not on)
         self.cb_type.setEnabled(on and not self.voucher_id)
@@ -723,11 +753,12 @@ class VoucherForm(QWidget):
         header = {"vtype": self.vtype, "number": self.ed_number.text().strip(), "voucher_date": self.ed_vdate.iso(),
                   "posting_date": self.ed_pdate.iso(), "partner_code": self.partner.code() or None,
                   "partner_name": self.partner.name.text().strip() or None, "tax_code": self.ed_tax.text().strip() or None,
-                  "description": self.ed_desc.text().strip() or None}
+                  "description": self.ed_desc.text().strip() or None,
+                  "source_voucher_id": self.data.get("source_voucher_id")}   # giữ liên kết chứng từ nguồn khi sửa
         if self.ed_inv_no.isVisible() or self.ed_inv_no.text().strip():
             inv = self.ed_inv_no.text().strip()
             header.update(invoice_no=inv or None, invoice_series=self.ed_inv_series.text().strip() or None,
-                          invoice_date=self.ed_inv_date.iso() if inv else None)
+                          invoice_date=self.ed_inv_date.iso() if inv else None, due_date=self.ed_due.iso())
         lines = []
         for ln in self.lines:
             d = {k: ln.get(k) for k in COL if k != "line_no"}

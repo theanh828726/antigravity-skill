@@ -52,6 +52,7 @@ jobs:
           New-Item -ItemType Directory -Force dist/UngDungKeToan/sample_data | Out-Null
           python -c "from ketoan.data.seed import create_database; create_database(r'dist/UngDungKeToan/sample_data/ketoan_demo.db').close()"
           Copy-Item docs/HUONG_DAN_CAI_DAT.md dist/UngDungKeToan/
+          Copy-Item -Recurse sample_data/hoa_don_xml dist/UngDungKeToan/sample_data/
       - name: Kiem tra exe khoi dong duoc (tu thoat sau 8 giay)
         shell: pwsh
         run: |

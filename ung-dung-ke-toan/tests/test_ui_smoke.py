@@ -187,3 +187,60 @@ def test_export_excel_pdf(window, tmp_path):
     assert isinstance(total_row[4], int) and total_row[4] == total_row[5]      # tiền xuất dạng số, PS Nợ = PS Có
     export.export_pdf(str(pdf), bar.html(), True)
     assert pdf.read_bytes()[:4] == b"%PDF" and pdf.stat().st_size > 5000
+
+
+def test_phase2_screens(window, tmp_path):
+    from ketoan.data.seed import write_sample_invoices
+    from ketoan.ui.phase2_views import CostingDialog
+    w = window
+    debt = w.open("m_congno")
+    assert debt.t_sum.rowCount() > 1
+    shot(w, "20_cong_no_tong_hop")
+    kh3 = w.session.db.scalar("SELECT id FROM partner WHERE company_id=1 AND code='KH003'")
+    debt._open_partner(kh3)
+    assert debt.t_doc.rowCount() > 1
+    shot(w, "21_cong_no_hoa_don_han_tt")
+    debt.tabs.setCurrentIndex(2)
+    shot(w, "22_tuoi_no")
+    inv = w.open("m_htk")
+    assert inv.t_nxt.rowCount() > 1
+    shot(w, "23_nhap_xuat_ton")
+    key = inv.t_nxt.item(0, 0).data(0x0100 + 1)
+    inv._open_card(key)
+    assert inv.t_card.rowCount() >= 2
+    shot(w, "24_the_kho")
+    w.open("c_opening_stock")
+    shot(w, "25_ton_kho_dau_ky")
+    w.cb_period.setCurrentIndex(w.cb_period.findText("Cả năm"))
+    w._period_selected()
+    dlg = CostingDialog(w, w)
+    dlg.d_from.set_iso("2026-07-01")
+    dlg.d_to.set_iso("2026-10-31")
+    dlg.refresh()
+    assert dlg.b_apply.isEnabled() and dlg.changes.rowCount() > 0
+    dlg.show()
+    if SHOTS:
+        QApplication.processEvents()
+        dlg.grab().save(os.path.join(SHOTS, "26_tinh_gia_xuat_kho.png"))
+    dlg.apply()
+    assert dlg.changes.rowCount() == 0                            # sau cập nhật không còn chênh lệch
+    dlg.close()
+    w.open("m_xuatloat")
+    shot(w, "27_xuat_kho_hang_loat")
+    rc = w.open("m_dtgv")
+    assert rc.table.rowCount() > 1
+    shot(w, "28_doi_chieu_dt_gv")
+    xv = w.open("c_import_xml")
+    files = write_sample_invoices(w.session.db, tmp_path / "xml")
+    xv.choose([str(f) for f in files])
+    assert xv.list.rowCount() == 4
+    xv.list.selectRow(1)
+    shot(w, "29_doc_hoa_don_xml")
+    xv.list.selectRow(0)
+    assert xv.b_create.isEnabled()
+    xv.create_voucher()
+    assert getattr(xv.invoices[0], "voucher_id", None)
+    form = w.tabs.currentWidget()
+    assert form.data["invoice_no"] == "0000199" and form.ed_due.isVisible()
+    shot(w, "30_chung_tu_tu_xml")
+    assert not w._warnings, w._warnings

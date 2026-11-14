@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon Id="data"><TTChung><PBan>2.0.0</PBan><THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon><KHMSHDon>1</KHMSHDon>
+<KHHDon>1C26TMK</KHHDon><SHDon>0000001</SHDon><NLap>2026-01-07</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung>
+<NDHDon><NBan><Ten>Công ty TNHH Thương mại – Dịch vụ Minh Khang (minh họa)</Ten><MST>0109990001</MST><DChi>Số 18 phố Minh Họa, quận Cầu Giấy, Hà Nội</DChi></NBan>
+<NMua><Ten>Công ty CP Công nghệ Ánh Dương (minh họa)</Ten><MST>0109990101</MST><DChi>Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><MHHDVu>HH005</MHHDVu><THHDVu>Máy in laser A4</THHDVu>
+<DVTinh>Chiếc</DVTinh><SLuong>2</SLuong><DGia>6210000</DGia><ThTien>12420000</ThTien>
+<TSuat>10%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><MHHDVu>HH006</MHHDVu><THHDVu>Giấy A4 70gsm</THHDVu>
+<DVTinh>Ram</DVTinh><SLuong>48</SLuong><DGia>90000</DGia><ThTien>4320000</ThTien>
+<TSuat>10%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>3</STT><MHHDVu>HH004</MHHDVu><THHDVu>Chuột không dây</THHDVu>
+<DVTinh>Chiếc</DVTinh><SLuong>47</SLuong><DGia>380000</DGia><ThTien>17860000</ThTien>
+<TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>34600000</TgTCThue><TgTThue>3460000</TgTThue><TgTTTBSo>38060000</TgTTTBSo></TToan></NDHDon></DLHDon>
+<DSCKS><NBan>(chữ ký số – không kiểm tra trong ứng dụng)</NBan></DSCKS></HDon>

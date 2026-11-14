@@ -18,7 +18,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from ketoan import APP_BRAND, APP_NAME
-from ketoan.data.db import Database
+from ketoan.data.db import SCHEMA_VERSION, Database
 
 
 def app_dirs() -> dict:
@@ -52,6 +52,10 @@ def open_or_create(path: Path, demo: bool = True) -> Database:
     if not db.is_app_database():
         db.close()
         raise RuntimeError(f"File {path} không phải dữ liệu của {APP_NAME}.")
+    if db.schema_version() > int(SCHEMA_VERSION):
+        db.close()
+        raise RuntimeError("Dữ liệu được tạo bởi phiên bản mới hơn của ứng dụng – hãy cập nhật ứng dụng.")
+    db.migrate()                       # nâng cấp dữ liệu phiên bản cũ (giao dịch nguyên tử)
     return db
 
 

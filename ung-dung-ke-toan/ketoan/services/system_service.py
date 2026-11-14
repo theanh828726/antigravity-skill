@@ -150,6 +150,7 @@ class BackupService:
             src.backup(self.db.conn)
         finally:
             src.close()
+        self.db.migrate()                     # bản sao lưu từ phiên bản cũ => nâng cấp lược đồ
         with self.db.transaction():
             self.s.audit("Khôi phục dữ liệu", "file", str(source), {"ban_sao_an_toan": str(safety)})
         return safety

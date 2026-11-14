@@ -38,7 +38,8 @@ LINE_FIELDS = ["description", "debit_account", "credit_account", "debit_partner_
                "warehouse_id", "unit", "quantity", "unit_price", "amount", "tax_rate", "tax_amount", "project_id",
                "department_id", "expense_item_id"]
 HEADER_FIELDS = ["vtype", "number", "voucher_date", "posting_date", "partner_id", "partner_name", "tax_code",
-                 "description", "invoice_no", "invoice_series", "invoice_date"]
+                 "description", "invoice_no", "invoice_series", "invoice_date", "due_date", "source_voucher_id"]
+DEBT_VTYPES = ("BKMH", "BKBH", "PKMB")      # chứng từ phát sinh công nợ theo hóa đơn, có hạn thanh toán
 
 
 class VoucherService:
@@ -215,6 +216,8 @@ class VoucherService:
         now, user = datetime.now().isoformat(timespec="seconds"), self.s.user.username
         h = {k: (header.get(k) or None) for k in HEADER_FIELDS}
         h.update(number=number, partner_id=partner_id, vtype=vtype)
+        if vtype in DEBT_VTYPES and not h["due_date"] and partner_id:
+            h["due_date"] = self.default_due_date(partner_id, h["invoice_date"] or h["voucher_date"])
         with self.db.transaction():
             if voucher_id:
                 self.db.execute(f"""UPDATE voucher SET {', '.join(k + '=?' for k in HEADER_FIELDS)}, status=?,
@@ -298,7 +301,9 @@ class VoucherService:
             qty, price = to_decimal(ln.get("quantity")), to_decimal(ln.get("unit_price"))
             if qty and price:
                 expect = line_amount(qty, price)
-                if expect != amt:
+                # Dòng xuất kho do chức năng tính giá cập nhật: chấp nhận chênh lệch làm tròn ≤ 10 đồng
+                tolerance = 10 if vt.code == "PXK" else 0
+                if abs(expect - amt) > tolerance:
                     add(SEV_REVIEW, "lech_thanh_tien",
                         f"Dòng {n}: Thành tiền {amt:,} khác Số lượng × Đơn giá {expect:,}".replace(",", "."), amt - expect, n)
             if vt.tax_account and ln.get("tax_rate") not in (None, ""):
@@ -387,21 +392,57 @@ class VoucherService:
             raise ValidationFailed(issues)
         now = datetime.now().isoformat(timespec="seconds")
         with self.db.transaction():
-            self.db.execute("DELETE FROM ledger_entry WHERE voucher_id=?", (voucher_id,))
-            for r in self.ledger_rows(v):
-                self.db.execute("""INSERT INTO ledger_entry(company_id, voucher_id, posting_date, line_id, account_code,
-                    contra_account, partner_id, item_id, warehouse_id, quantity, project_id, department_id, expense_item_id,
-                    debit, credit, description, is_tax) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                (self.s.company_id, voucher_id, v["posting_date"], *r))
-            d = self.db.one("SELECT COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM ledger_entry WHERE voucher_id=?",
-                            (voucher_id,))
-            if d["d"] != d["c"]:     # chốt chặn cuối cùng – không bao giờ ghi sổ lệch
-                raise BusinessError(f"Bút toán sinh ra không cân đối ({d['d']} ≠ {d['c']}). Đã hoàn tác.")
+            d = self._write_ledger(v)
             self.db.execute("""UPDATE voucher SET status=?, posted_by=?, posted_at=?,
                                checked_by=COALESCE(checked_by, ?), checked_at=COALESCE(checked_at, ?) WHERE id=?""",
                             (POSTED, self.s.user.username, now, self.s.user.username, now, voucher_id))
             self.s.audit("Ghi sổ", "voucher", f"{v['vtype']}/{v['number']}", {"tong_no": d["d"]})
         return issues
+
+    def _write_ledger(self, v: dict) -> dict:
+        """Xóa và sinh lại bút toán sổ cái của chứng từ; luôn kiểm tra tổng Nợ = tổng Có."""
+        voucher_id = v["id"]
+        self.db.execute("DELETE FROM ledger_entry WHERE voucher_id=?", (voucher_id,))
+        for r in self.ledger_rows(v):
+            self.db.execute("""INSERT INTO ledger_entry(company_id, voucher_id, posting_date, line_id, account_code,
+                contra_account, partner_id, item_id, warehouse_id, quantity, project_id, department_id, expense_item_id,
+                debit, credit, description, is_tax) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (self.s.company_id, voucher_id, v["posting_date"], *r))
+        d = self.db.one("SELECT COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM ledger_entry WHERE voucher_id=?",
+                        (voucher_id,))
+        if d["d"] != d["c"]:     # chốt chặn cuối cùng – không bao giờ ghi sổ lệch
+            raise BusinessError(f"Bút toán sinh ra không cân đối ({d['d']} ≠ {d['c']}). Đã hoàn tác.")
+        return d
+
+    def update_line_prices(self, changes: list[tuple]):
+        """Cập nhật đơn giá/thành tiền dòng (dùng cho tính giá xuất kho) và ghi lại sổ nếu chứng từ đã ghi sổ.
+
+        changes: [(line_id, unit_price(Decimal), amount(int))]. Gọi trong giao dịch của nơi gọi.
+        """
+        by_voucher: dict[int, list] = {}
+        for line_id, price, amount in changes:
+            vid = self.db.scalar("SELECT voucher_id FROM voucher_line WHERE id=?", (line_id,))
+            by_voucher.setdefault(vid, []).append((line_id, price, amount))
+        for vid, items in by_voucher.items():
+            v = self.db.one("SELECT * FROM voucher WHERE id=?", (vid,))
+            if self.periods.is_locked(v["posting_date"]):
+                raise BusinessError(f"Chứng từ {v['number']} thuộc kỳ đã khóa – không cập nhật giá.")
+            for line_id, price, amount in items:
+                self.db.execute("UPDATE voucher_line SET unit_price=?, amount=? WHERE id=?",
+                                (dec_to_str(price), amount, line_id))
+            full = self.get(vid)
+            tot = self.totals(full["vtype"], full["lines"])
+            self.db.execute("UPDATE voucher SET total_amount=?, total_tax=?, total_payment=? WHERE id=?",
+                            (tot["amount"], tot["tax"], tot["payment"], vid))
+            if v["status"] == POSTED:
+                self._write_ledger(full)
+
+    def default_due_date(self, partner_id, base_date: str | None) -> str | None:
+        if not base_date:
+            return None
+        terms = self.db.scalar("SELECT payment_terms FROM partner WHERE id=?", (partner_id,), 0) or 0
+        from datetime import timedelta
+        return (date.fromisoformat(base_date[:10]) + timedelta(days=int(terms))).isoformat()
 
     def unpost(self, voucher_id: int):
         self.s.require("post", "bỏ ghi sổ")

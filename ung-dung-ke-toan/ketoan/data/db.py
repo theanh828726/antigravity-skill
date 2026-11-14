@@ -11,7 +11,35 @@ import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
+
+# Migration theo phiên bản: schema.sql là phiên bản 1; các phiên bản sau áp dụng tuần tự,
+# kể cả với file dữ liệu tạo từ phiên bản cũ (nâng cấp tại chỗ, trong một giao dịch).
+MIGRATIONS: dict[int, list[str]] = {
+    2: [
+        "ALTER TABLE voucher ADD COLUMN due_date TEXT",
+        "ALTER TABLE voucher ADD COLUMN source_voucher_id INTEGER",
+        "ALTER TABLE company ADD COLUMN costing_method TEXT NOT NULL DEFAULT 'BQCK'",
+        """CREATE TABLE IF NOT EXISTS opening_stock (
+            id INTEGER PRIMARY KEY,
+            company_id INTEGER NOT NULL REFERENCES company(id) ON DELETE CASCADE,
+            year INTEGER NOT NULL,
+            item_id INTEGER NOT NULL REFERENCES item(id),
+            warehouse_id INTEGER NOT NULL REFERENCES warehouse(id),
+            quantity TEXT NOT NULL DEFAULT '0',
+            amount INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(company_id, year, item_id, warehouse_id))""",
+        """CREATE TABLE IF NOT EXISTS costing_run (
+            id INTEGER PRIMARY KEY, company_id INTEGER NOT NULL, d_from TEXT NOT NULL, d_to TEXT NOT NULL,
+            method TEXT NOT NULL, run_by TEXT, run_at TEXT, lines_updated INTEGER, total_change INTEGER, detail TEXT)""",
+        "CREATE INDEX IF NOT EXISTS ix_voucher_source ON voucher(source_voucher_id)",
+        "CREATE INDEX IF NOT EXISTS ix_le_item ON ledger_entry(company_id, item_id, warehouse_id, posting_date)",
+        # hạn thanh toán cho chứng từ mua/bán đã có = ngày hóa đơn (hoặc ngày CT) + số ngày hạn TT của đối tượng
+        """UPDATE voucher SET due_date = date(COALESCE(invoice_date, voucher_date), '+' ||
+               COALESCE((SELECT payment_terms FROM partner p WHERE p.id = voucher.partner_id), 0) || ' days')
+           WHERE due_date IS NULL AND vtype IN ('BKMH', 'BKBH', 'PKMB')""",
+    ],
+}
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")
 APP_SIGNATURE = "ketoan-hocviendaotaoai"
 
@@ -53,8 +81,27 @@ class Database:
     def init_schema(self):
         self.conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
         with self.transaction():
-            self.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)", (SCHEMA_VERSION,))
+            self.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', '1')")
             self.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('signature', ?)", (APP_SIGNATURE,))
+        self.migrate()
+
+    def schema_version(self) -> int:
+        try:
+            return int(self.scalar("SELECT value FROM meta WHERE key='schema_version'", default="1"))
+        except sqlite3.Error:
+            return 0
+
+    def migrate(self) -> list[int]:
+        """Nâng cấp lược đồ lên SCHEMA_VERSION. Trả về danh sách phiên bản đã áp dụng."""
+        applied = []
+        current = self.schema_version()
+        for ver in sorted(v for v in MIGRATIONS if v > current):
+            with self.transaction():
+                for sql in MIGRATIONS[ver]:
+                    self.execute(sql)
+                self.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('schema_version', ?)", (str(ver),))
+            applied.append(ver)
+        return applied
 
     def is_app_database(self) -> bool:
         try:

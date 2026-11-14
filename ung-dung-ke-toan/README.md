@@ -1,10 +1,11 @@
 # Ứng dụng Kế toán – Hocviendaotaoai
 
 Phần mềm kế toán Windows (Python + PySide6) cho doanh nghiệp thương mại, dịch vụ, sản xuất, xây dựng, vận tải.
-**Bản hiện tại: Giai đoạn 1** – chạy được, có dữ liệu minh họa liên kết đầy đủ.
+**Bản hiện tại: Giai đoạn 2 (v1.1.0)** – Giai đoạn 1 + công nợ, tiền mặt – ngân hàng, mua bán hàng, nhập – xuất – tồn,
+tính giá xuất kho. Chạy được, có dữ liệu minh họa liên kết đầy đủ.
 
 ```
-Danh mục → Nhập chứng từ → Kiểm tra → Ghi sổ → (Công nợ, kho, giá thành – GĐ2/3) → Sổ kế toán → Báo cáo
+Danh mục → Nhập chứng từ → Kiểm tra → Ghi sổ → Công nợ, kho (GĐ2) → giá thành (GĐ3) → Sổ kế toán → Báo cáo
 ```
 Dữ liệu chỉ nhập một lần; mọi dòng sổ mang khóa chứng từ để **truy ngược về chứng từ gốc**.
 
@@ -43,7 +44,12 @@ Tùy chọn: `--db <file.db>` mở file chỉ định · `--reset-demo` tạo l�
 | Kết chuyển | Xem trước → xác nhận → tạo & ghi sổ; hoàn tác khi kỳ chưa khóa | ✅ GĐ1 |
 | Hệ thống | Đa doanh nghiệp, đa năm, khóa kỳ theo tháng, phân quyền 8 quyền × vai trò, nhật ký thay đổi, sao lưu – khôi phục (tự sao lưu an toàn trước khi khôi phục), chế độ kế toán có phiên bản theo ngày hiệu lực | ✅ GĐ1 |
 | Xuất | Excel (giữ kiểu số), PDF, xem trước khi in – mọi sổ, danh sách, chứng từ | ✅ GĐ1 |
-| GĐ2 | Công nợ chuyên sâu (tuổi nợ, hạn TT), kho nhập–xuất–tồn & số lượng tồn đầu, **tính giá xuất kho**, xuất kho hàng loạt, đối chiếu DT–GV, đọc hóa đơn XML | ⏳ ô hiển thị nhãn **GĐ2**, nút Tính giá xuất kho bị vô hiệu kèm chú thích |
+| Công nợ | Tổng hợp theo đối tượng + MST + số quá hạn; chi tiết theo hóa đơn – hạn thanh toán (mặc định = ngày HĐ + hạn TT của đối tượng, sửa được trên chứng từ); phân tích tuổi nợ 5 nhóm; **biên bản đối chiếu công nợ** in/PDF. Thanh toán phân bổ tự động FIFO theo hạn (chỉ để theo dõi, không ghi sổ) | ✅ GĐ2 |
+| Kho | Tồn kho đầu kỳ (SL + giá trị, đối chiếu số dư TK kho), Nhập – xuất – tồn theo hàng/kho/kỳ, Thẻ kho, truy ngược chứng từ | ✅ GĐ2 |
+| Tính giá xuất kho | **Bình quân gia quyền cuối tháng** hoặc **FIFO** theo mã hàng + kho; bảng xem trước (tồn đầu, nhập, xuất cũ/mới, chênh lệch, cảnh báo) → xác nhận → cập nhật dòng xuất và ghi lại sổ trong một giao dịch; chạy lại không thay đổi kết quả. Phạm vi ghi rõ trên màn hình | ✅ GĐ2 |
+| Mua – bán | **Đọc hóa đơn XML** (nhận diện mua vào/bán ra theo MST, khớp đối tượng & mã hàng, đối chiếu tổng tiền/thuế, phát hiện trùng, tạo đối tượng mới khi xác nhận) → tạo chứng từ **nháp**; **Xuất kho hàng loạt** từ bảng kê bán (liên kết chứng từ nguồn, không lập trùng); **Đối chiếu doanh thu – giá vốn** theo mặt hàng | ✅ GĐ2 |
+| Cảnh báo bổ sung | Tồn quỹ tiền mặt âm, bán hàng chưa xuất kho/giá vốn, hàng hết SL còn giá trị (cần tính giá), tồn kho đầu kỳ lệch số dư TK kho; tồn âm có tính tồn đầu kỳ | ✅ GĐ2 |
+| Nâng cấp dữ liệu | Migration lược đồ theo phiên bản: file dữ liệu GĐ1 (và bản sao lưu cũ khi khôi phục) tự nâng cấp trong một giao dịch | ✅ GĐ2 |
 | GĐ3 | TSCĐ (khấu hao), CCDC (phân bổ), giá thành (8 loại), BCTC theo mẫu, hỗ trợ thuế GTGT/TNDN/TNCN, in hồ sơ | ⏳ ô hiển thị nhãn **GĐ3**, mở ra trang mô tả phạm vi – không giả lập |
 
 ## 3. Kiến trúc
@@ -67,12 +73,16 @@ ung-dung-ke-toan/
 │   │   ├── ledger_service.py     # NKC, sổ cái, sổ chi tiết, CĐSPS
 │   │   ├── alert_service.py      # trung tâm cảnh báo
 │   │   ├── closing_service.py    # kết chuyển cuối kỳ
+│   │   ├── inventory_service.py  # GĐ2: tồn đầu kỳ, NXT, thẻ kho, tính giá xuất kho (BQCK/FIFO)
+│   │   ├── debt_service.py       # GĐ2: công nợ, hạn thanh toán, tuổi nợ, đối chiếu
+│   │   ├── trade_service.py      # GĐ2: xuất kho hàng loạt, đối chiếu doanh thu – giá vốn
+│   │   ├── xml_invoice.py        # GĐ2: đọc hóa đơn điện tử XML
 │   │   ├── period_service.py     # năm tài chính, khóa kỳ
 │   │   └── system_service.py     # doanh nghiệp, chế độ KT, số dư đầu, sao lưu, nhật ký
 │   ├── reports/export.py         # Excel / PDF / in
 │   └── ui/                       # PySide6 – chỉ gọi services, không viết SQL
-├── tests/                        # 17 kiểm thử: nghiệp vụ + giao diện offscreen
-├── sample_data/ketoan_demo.db    # CSDL mẫu
+├── tests/                        # 28 kiểm thử: nghiệp vụ GĐ1 + GĐ2 + giao diện offscreen
+├── sample_data/                  # ketoan_demo.db + hoa_don_xml/ (4 hóa đơn XML mẫu)
 ├── packaging/                    # PyInstaller spec, build_windows.bat, Inno Setup
 └── docs/                         # hướng dẫn cài đặt, kết quả kiểm tra, ảnh màn hình
 ```
@@ -83,7 +93,8 @@ ung-dung-ke-toan/
 - Bảng `ledger_entry` chỉ được sinh khi **Ghi sổ** và xóa khi **Bỏ ghi sổ**; mọi báo cáo đọc từ bảng này → báo cáo luôn khớp chứng từ đã ghi sổ.
 - Mọi thao tác ghi nằm trong `Database.transaction()` (BEGIN IMMEDIATE … COMMIT/ROLLBACK) – lưu đủ hoặc hoàn tác đủ; ghi sổ có chốt chặn cuối kiểm tra tổng Nợ = tổng Có.
 - Thuế GTGT trên bảng kê mua/bán được sinh bút toán riêng (Nợ 1331 / Có TK đối ứng; Nợ TK đối ứng / Có 33311).
-- **Đa người dùng qua LAN**: không chia sẻ file SQLite qua mạng. Lớp `Database` có giao diện `query/execute/transaction` để thay bằng PostgreSQL (dự kiến cùng GĐ2).
+- Phiếu xuất kho liên kết bảng kê bán qua `voucher.source_voucher_id`; tính giá xuất kho chỉ sửa dòng xuất của kỳ chưa khóa và ghi lại sổ của chứng từ đó trong cùng giao dịch.
+- **Đa người dùng qua LAN**: không chia sẻ file SQLite qua mạng. Lớp `Database` có giao diện `query/execute/transaction` để thay bằng PostgreSQL (chưa triển khai – đề xuất làm cùng GĐ3).
 
 ## 4. Chế độ kế toán & quy định
 
@@ -97,7 +108,7 @@ ung-dung-ke-toan/
 ```bash
 QT_QPA_PLATFORM=offscreen python -m pytest -q tests        # Windows PowerShell: $env:QT_QPA_PLATFORM="offscreen"
 ```
-Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md).
+Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md) (28 kiểm thử).
 Workflow `.github/workflows/ketoan-windows.yml` chạy kiểm thử trên Linux + Windows, đóng gói `.exe` và kiểm tra exe khởi động.
 
 ## 6. Phím tắt chính

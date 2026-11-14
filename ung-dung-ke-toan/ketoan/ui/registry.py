@@ -1,11 +1,14 @@
 """Danh mục chức năng: một nguồn duy nhất cho ô chức năng, menu và tab.
 
-phase = 1: đã triển khai ở giai đoạn 1.  phase = 2/3: CHƯA triển khai – ô hiển thị nhãn giai đoạn,
-mở ra trang mô tả phạm vi dự kiến (không giả lập chức năng).
+phase: giai đoạn triển khai của chức năng. phase <= IMPLEMENTED_PHASE: đã chạy được.
+phase > IMPLEMENTED_PHASE: CHƯA triển khai – ô hiển thị nhãn giai đoạn, mở ra trang mô tả phạm vi dự kiến (không giả lập).
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+
+
+IMPLEMENTED_PHASE = 2
 
 
 @dataclass(frozen=True)
@@ -17,6 +20,10 @@ class Func:
     phase: int = 1
     args: dict = field(default_factory=dict)
     plan: str = ""       # mô tả phạm vi dự kiến cho chức năng chưa triển khai
+
+    @property
+    def pending(self) -> bool:
+        return self.phase > IMPLEMENTED_PHASE
 
 
 def _f(*a, **k):
@@ -44,16 +51,13 @@ FUNCS: dict[str, Func] = dict([
     _f("r_cdps", "Bảng cân đối số phát sinh", "scale", "bao_cao"),
     _f("r_soquy", "Sổ quỹ tiền mặt", "cash", "tien", 1, {"account": "111"}),
     _f("r_sotgnh", "Sổ tiền gửi ngân hàng", "bank_book", "tien", 1, {"account": "112"}),
-    _f("m_congno", "Quản lý công nợ", "debt", "mua_ban", 2,
-       plan="Tổng hợp/chi tiết công nợ phải thu, phải trả theo mã đối tượng, mã số thuế, hóa đơn; tuổi nợ, hạn "
-            "thanh toán; đối chiếu công nợ; bù trừ công nợ. Hiện có thể xem chi tiết công nợ qua «Sổ chi tiết tài khoản» "
-            "131/331 lọc theo đối tượng."),
-    _f("m_htk", "Quản lý hàng tồn kho", "warehouse", "kho", 2,
-       plan="Nhập – xuất – tồn theo hàng hóa, kho, kỳ; số lượng tồn đầu kỳ; thẻ kho; tồn kho tối thiểu."),
-    _f("m_xuatloat", "Xuất kho hàng loạt", "boxes", "kho", 2,
-       plan="Lập phiếu xuất kho hàng loạt từ bảng kê bán hàng theo kỳ, giá xuất tính theo phương pháp đã chọn."),
-    _f("m_dtgv", "Đối chiếu doanh thu – giá vốn", "compare", "mua_ban", 2,
-       plan="Đối chiếu số lượng bán và số lượng xuất kho theo mặt hàng, phát hiện hàng bán chưa ghi giá vốn."),
+    _f("m_congno", "Quản lý công nợ", "debt", "mua_ban", 2),
+    _f("m_htk", "Quản lý hàng tồn kho", "warehouse", "kho", 2),
+    _f("m_xuatloat", "Xuất kho hàng loạt", "boxes", "kho", 2),
+    _f("m_dtgv", "Đối chiếu doanh thu – giá vốn", "compare", "mua_ban", 2),
+    _f("m_tinhgia", "Tính giá xuất kho", "calc", "kho", 2),
+    _f("m_thekho", "Thẻ kho", "columns", "kho", 2),
+    _f("c_opening_stock", "Tồn kho đầu kỳ", "box", "kho", 2),
     _f("m_tscd", "Tài sản cố định", "asset", "tai_san", 3,
        plan="Ghi tăng/giảm TSCĐ, tính khấu hao tự động theo đường thẳng, phân bổ chi phí khấu hao theo bộ phận. "
             "Hiện đã có danh mục TSCĐ (Danh mục → Tài sản cố định)."),
@@ -102,9 +106,7 @@ FUNCS: dict[str, Func] = dict([
     # ---------------- Danh mục & hệ thống
     _f("c_catalog", "Danh mục", "folder", "he_thong"),
     _f("c_opening", "Số dư đầu kỳ", "scale", "he_thong"),
-    _f("c_import_xml", "Đọc hóa đơn XML", "import", "mua_ban", 2,
-       plan="Đọc hóa đơn điện tử XML theo cấu trúc được hỗ trợ, hiển thị kết quả để người dùng kiểm tra trước khi "
-            "tạo chứng từ mua/bán."),
+    _f("c_import_xml", "Đọc hóa đơn XML", "import", "mua_ban", 2),
     _f("s_alerts", "Trung tâm cảnh báo", "alert", "thue"),
     _f("s_lock", "Khóa sổ kỳ kế toán", "lock", "he_thong"),
     _f("s_users", "Người dùng & phân quyền", "users", "he_thong"),
@@ -118,7 +120,7 @@ FUNCS: dict[str, Func] = dict([
 DASHBOARD_GROUPS = [
     ("CHỨNG TỪ NGHIỆP VỤ", ["v_BKMH", "v_BKBH", "v_PKMB", "v_PT", "v_PC", "v_PNK", "v_PXK", "v_PKT", "v_NH", "v_CTK"]),
     ("SỔ SÁCH VÀ QUẢN TRỊ", ["r_nkc", "r_socai", "r_sct", "r_cdps", "r_soquy", "r_sotgnh", "m_congno", "m_htk",
-                             "m_xuatloat", "m_dtgv", "m_tscd", "m_ccdc", "gt_ct", "gt_sct", "gt_dm", "gt_kdm", "gt_gd",
+                             "m_xuatloat", "m_dtgv", "m_tinhgia", "m_tscd", "m_ccdc", "gt_ct", "gt_sct", "gt_dm", "gt_kdm", "gt_gd",
                              "gt_dv", "gt_vt", "gt_kdd", "m_nhquy", "m_inhs"]),
     ("BÁO CÁO TÀI CHÍNH", ["r_cdps", "bc_cdkt", "bc_kqkd", "bc_lctt", "bc_tm"]),
     ("BÁO CÁO THUẾ", ["t_gtgt", "t_tndn", "t_tncn", "t_doichieu"]),
@@ -127,13 +129,15 @@ DASHBOARD_GROUPS = [
 # Menu trái: (nhãn, icon, [(tiêu đề nhóm, [func keys])]) – mục có 1 chức năng duy nhất mở thẳng chức năng đó
 MENU = [
     ("Tổng quan", "home", "dashboard"),
-    ("Danh mục", "folder", [("DANH MỤC", ["c_catalog", "c_opening", "c_import_xml"])]),
-    ("Chứng từ nghiệp vụ", "docs", [("CHỨNG TỪ NGHIỆP VỤ", DASHBOARD_GROUPS[0][1] + ["v_ALL"])]),
+    ("Danh mục", "folder", [("DANH MỤC", ["c_catalog", "c_opening", "c_opening_stock", "c_import_xml"])]),
+    ("Chứng từ nghiệp vụ", "docs", [("CHỨNG TỪ NGHIỆP VỤ", DASHBOARD_GROUPS[0][1] + ["v_ALL"]),
+                                    ("TIỆN ÍCH MUA – BÁN", ["c_import_xml", "m_xuatloat", "m_dtgv"])]),
     ("Sổ sách kế toán", "book", [("SỔ SÁCH KẾ TOÁN", ["r_nkc", "r_socai", "r_sct", "r_cdps", "r_soquy", "r_sotgnh"])]),
     ("Báo cáo tài chính", "chart", [DASHBOARD_GROUPS[2]]),
     ("Báo cáo thuế", "tax", [DASHBOARD_GROUPS[3], ("KIỂM TRA, ĐỐI CHIẾU", ["s_alerts"])]),
-    ("Quản lý công nợ", "debt", [("QUẢN LÝ CÔNG NỢ", ["m_congno", "r_sct"])]),
-    ("Quản lý hàng tồn kho", "warehouse", [("QUẢN LÝ HÀNG TỒN KHO", ["m_htk", "m_xuatloat", "m_dtgv", "v_PNK", "v_PXK"])]),
+    ("Quản lý công nợ", "debt", [("QUẢN LÝ CÔNG NỢ", ["m_congno", "r_sct", "v_BKMH", "v_BKBH", "v_PT", "v_PC", "v_NH"])]),
+    ("Quản lý hàng tồn kho", "warehouse", [("QUẢN LÝ HÀNG TỒN KHO", ["m_htk", "m_thekho", "m_tinhgia", "m_xuatloat", "m_dtgv",
+                                                                    "c_opening_stock", "v_PNK", "v_PXK"])]),
     ("Tài sản cố định", "asset", [("TÀI SẢN CỐ ĐỊNH", ["m_tscd"])]),
     ("Công cụ dụng cụ", "tools", [("CÔNG CỤ DỤNG CỤ", ["m_ccdc"])]),
     ("Giá thành", "factory", [("GIÁ THÀNH", ["gt_ct", "gt_sct", "gt_dm", "gt_kdm", "gt_gd", "gt_dv", "gt_vt", "gt_kdd"])]),

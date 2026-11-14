@@ -10,6 +10,7 @@ from calendar import monthrange
 from pathlib import Path
 
 from ketoan.data.db import Database
+from ketoan.domain.money import to_decimal
 from ketoan.services.auth_service import create_user, ensure_default_roles
 from ketoan.services.context import CurrentUser, Session
 
@@ -229,15 +230,20 @@ def _seed_demo(db: Database, admin: CurrentUser):
         ], ["code", "name", "asset_account", "depreciation_account", "expense_account", "original_cost", "start_date",
             "useful_months", "department"])
         pid = {r["code"]: r["id"] for r in db.query("SELECT id, code FROM partner WHERE company_id=?", (cid,))}
-        ob = [("1111", None, 185_000_000, 0), ("1121", None, 1_682_000_000, 0), ("131", pid["KH001"], 120_000_000, 0),
+        ob = [("1111", None, 185_000_000, 0), ("1121", None, 1_672_800_000, 0), ("156", None, 9_200_000, 0), ("131", pid["KH001"], 120_000_000, 0),
               ("131", pid["KH002"], 85_500_000, 0), ("2111", None, 680_000_000, 0), ("242", None, 36_000_000, 0),
               ("2141", None, 0, 136_000_000), ("331", pid["NCC001"], 0, 158_000_000),
               ("331", pid["NCC002"], 0, 64_000_000), ("334", None, 0, 92_000_000), ("33311", None, 0, 28_500_000),
               ("4111", None, 0, 1_800_000_000), ("4211", None, 0, 510_000_000)]
         db.executemany("INSERT INTO opening_balance(company_id, year, account_code, partner_id, debit, credit) "
                        "VALUES(?,?,?,?,?,?)", [(cid, 2026, *x) for x in ob])
+        # tồn kho đầu kỳ chi tiết – khớp số dư đầu năm TK 156
+        db.execute("""INSERT INTO opening_stock(company_id, year, item_id, warehouse_id, quantity, amount)
+                      SELECT ?, 2026, i.id, w.id, '2', 9200000 FROM item i, warehouse w
+                      WHERE i.company_id=? AND i.code='HH005' AND w.company_id=? AND w.code='KHO02'""", (cid, cid, cid))
 
-    vs, cs, ps = VoucherService(s), ClosingService(s), PeriodService(s)
+    from ketoan.services.inventory_service import InventoryService
+    vs, cs, ps, inv = VoucherService(s), ClosingService(s), PeriodService(s), InventoryService(s)
 
     def mk(vtype, d, lines, partner=None, desc="", inv=None, series=None, post=True, check=False, **kw):
         tax = db.scalar("SELECT tax_code FROM partner WHERE company_id=? AND code=?", (cid, partner)) if partner else None
@@ -261,6 +267,9 @@ def _seed_demo(db: Database, admin: CurrentUser):
     out_inv = 0
     for m in range(1, 11):
         last = f"2026-{m:02d}-{monthrange(2026, m)[1]:02d}"
+        if m > 1:   # giá nhập biến động theo tháng => tính giá xuất kho có ý nghĩa
+            for code in cost:
+                cost[code] = int(round(cost[code] * (1 + rnd.uniform(-0.03, 0.04)), -3))
         # ---- Kế hoạch bán trong tháng (3 khách hàng × 3 mặt hàng), mua đủ hàng + dự trữ trước khi bán
         plan = []
         for k, cus in enumerate(rnd.sample(customers, 4)):
@@ -310,8 +319,9 @@ def _seed_demo(db: Database, admin: CurrentUser):
             if not sl:
                 continue
             out_inv += 1
-            mk("BKBH", f"2026-{m:02d}-{day:02d}", sl, cus, f"Bán hàng cho {cus}", f"{out_inv:07d}", "1C26TMK")
-            mk("PXK", f"2026-{m:02d}-{day:02d}", xl, cus, f"Xuất kho bán hàng cho {cus}")
+            sale_id = mk("BKBH", f"2026-{m:02d}-{day:02d}", sl, cus, f"Bán hàng cho {cus}", f"{out_inv:07d}", "1C26TMK")
+            mk("PXK", f"2026-{m:02d}-{day:02d}", xl, cus, f"Xuất kho bán hàng cho {cus} (giá tạm = giá nhập gần nhất)",
+               source_voucher_id=sale_id)
         # ---- Thu tiền khách hàng (qua ngân hàng / tiền mặt)
         if m == 1:
             mk("PT", "2026-01-20", [{"description": "Thu nợ cũ", "debit_account": "1111", "credit_account": "131",
@@ -380,13 +390,14 @@ def _seed_demo(db: Database, admin: CurrentUser):
                                       "amount": 1_250_000, "expense_item": "CP04"}], None,
                "Chi văn phòng phẩm (nhập sót, chưa ghi sổ)", post=False)
         # Kết chuyển các tháng 1–6 rồi khóa sổ
-        if m <= 6:
+        if m <= 6:   # tính giá xuất kho bình quân cuối tháng → kết chuyển (các tháng 7–10 để người dùng tự chạy)
+            inv.costing_apply(f"2026-{m:02d}-01", last)
             cs.execute(f"2026-{m:02d}-01", last)
 
     # ---- Tình huống minh họa cho Trung tâm cảnh báo (tháng 10–11/2026)
     mk("PXK", "2026-10-28", [{"description": "Xuất máy in trưng bày", "debit_account": "6421", "credit_account": "156",
-                              "item": "HH005", "warehouse": "KHO02", "quantity": 1, "unit_price": cost["HH005"]}],
-       None, "Xuất máy in từ kho Long Biên (chưa nhập kho) – tồn âm")
+                              "item": "HH005", "warehouse": "KHO02", "quantity": 3, "unit_price": 4_600_000}],
+       None, "Xuất 3 máy in từ kho Long Biên (tồn đầu năm 2) – tồn âm")
     mk("PT", "2026-10-30", [{"description": "Khách hàng ứng trước", "debit_account": "1111", "credit_account": "131",
                              "credit_partner": "KH005", "amount": 50_000_000}], "KH005", "KH005 ứng trước tiền hàng")
     mk("BKBH", "2026-11-06", [{"description": "Bán máy tính xách tay", "debit_account": "131", "credit_account": "5111",
@@ -455,8 +466,68 @@ def _seed_demo(db: Database, admin: CurrentUser):
     return db
 
 
+def write_sample_invoices(db: Database, folder: str | Path) -> list[Path]:
+    """Sinh hóa đơn điện tử XML minh họa (cấu trúc HDon/DLHDon) cho chức năng Đọc hóa đơn XML."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    me = db.one("SELECT * FROM company WHERE code='MK'")
+
+    def xml(series, number, d, seller, buyer, lines, tax_total=None):
+        rows, tot, tax = [], 0, 0
+        for i, (code, name, unit, qty, price, rate) in enumerate(lines, 1):
+            amt = round(qty * price)
+            tot += amt
+            tax += round(amt * rate / 100 + 1e-9) if isinstance(rate, (int, float)) else 0
+            rows.append(f"""<HHDVu><TChat>1</TChat><STT>{i}</STT><MHHDVu>{code}</MHHDVu><THHDVu>{name}</THHDVu>
+<DVTinh>{unit}</DVTinh><SLuong>{qty}</SLuong><DGia>{price}</DGia><ThTien>{amt}</ThTien>
+<TSuat>{f"{rate}%" if isinstance(rate, (int, float)) else rate}</TSuat></HHDVu>""")
+        tax = tax if tax_total is None else tax_total
+        return f"""<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon Id="data"><TTChung><PBan>2.0.0</PBan><THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon><KHMSHDon>1</KHMSHDon>
+<KHHDon>{series}</KHHDon><SHDon>{number}</SHDon><NLap>{d}</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung>
+<NDHDon><NBan><Ten>{seller[0]}</Ten><MST>{seller[1]}</MST><DChi>{seller[2]}</DChi></NBan>
+<NMua><Ten>{buyer[0]}</Ten><MST>{buyer[1]}</MST><DChi>{buyer[2]}</DChi></NMua>
+<DSHHDVu>{''.join(rows)}</DSHHDVu>
+<TToan><TgTCThue>{tot}</TgTCThue><TgTThue>{tax}</TgTThue><TgTTTBSo>{tot + tax}</TgTTTBSo></TToan></NDHDon></DLHDon>
+<DSCKS><NBan>(chữ ký số – không kiểm tra trong ứng dụng)</NBan></DSCKS></HDon>"""
+
+    mine = (me["name"], me["tax_code"], me["address"])
+    ncc1 = db.one("SELECT name, tax_code, address FROM partner WHERE company_id=? AND code='NCC001'", (me["id"],))
+    first_sale = db.one("""SELECT v.invoice_series, v.invoice_no, v.invoice_date, p.name, p.tax_code, p.address, v.id
+                           FROM voucher v JOIN partner p ON p.id=v.partner_id WHERE v.company_id=? AND v.vtype='BKBH'
+                           ORDER BY v.id LIMIT 1""", (me["id"],))
+    sale_lines = db.query("""SELECT i.code, i.name, i.unit, l.quantity, l.unit_price, l.tax_rate FROM voucher_line l
+                             JOIN item i ON i.id=l.item_id WHERE l.voucher_id=? ORDER BY l.line_no""", (first_sale["id"],))
+    files = {
+        "01_mua_hang_NCC001.xml": xml("1C26TAA", "0000199", "2026-11-10", tuple(ncc1), mine,
+                                      [("HH004", "Chuột không dây", "Chiếc", 50, 235000, 10),
+                                       ("HH006", "Giấy A4 70gsm", "Ram", 100, 63000, 10)]),
+        "02_mua_hang_NCC_moi_lech_lam_tron.xml": xml(
+            "1C26THS", "0000057", "2026-11-12",
+            ("Công ty TNHH Văn phòng phẩm Hoa Sen (minh họa)", "0109990401", "Số 5 phố Minh Họa, Hà Nội"), mine,
+            [("VPP01", "Bìa hồ sơ nhựa", "Cái", 1, 12345, 10), ("VPP02", "Bút bi xanh", "Hộp", 1, 23455, 10),
+             ("VPP03", "Kẹp giấy", "Hộp", 1, 34565, 10)], tax_total=7037),
+        "03_ban_hang_da_nhap.xml": xml(first_sale["invoice_series"], first_sale["invoice_no"], first_sale["invoice_date"], mine,
+                                       (first_sale["name"], first_sale["tax_code"], first_sale["address"]),
+                                       [(r["code"], r["name"], r["unit"], int(to_decimal(r["quantity"])),
+                                         int(to_decimal(r["unit_price"])), int(to_decimal(r["tax_rate"]))) for r in sale_lines]),
+        "04_khong_thuoc_doanh_nghiep.xml": xml("1C26TXX", "0000001", "2026-11-01",
+                                               ("Công ty A (minh họa)", "0100000011", "Hà Nội"),
+                                               ("Công ty B (minh họa)", "0100000022", "Hà Nội"),
+                                               [("X", "Hàng hóa X", "Cái", 1, 1000000, 10)]),
+    }
+    out = []
+    for name, content in files.items():
+        p = folder / name
+        p.write_text(content, encoding="utf-8")
+        out.append(p)
+    return out
+
+
 if __name__ == "__main__":
     import sys
     target = sys.argv[1] if len(sys.argv) > 1 else "ketoan_demo.db"
-    create_database(target, demo=True)
+    d = create_database(target, demo=True)
+    for f in write_sample_invoices(d, Path(target).parent / "hoa_don_xml"):
+        print("Hóa đơn mẫu:", f)
     print("Đã tạo", target)

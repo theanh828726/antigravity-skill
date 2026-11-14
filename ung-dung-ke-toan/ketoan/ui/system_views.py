@@ -87,7 +87,7 @@ class AlertView(QWidget):
             lab.setText(f"<span style='color:{SEV_COLOR[k]};font-weight:700;font-size:13pt'>{n}</span>&nbsp; {SEV_LABEL[k]}")
         self.table.fill(["Mức độ", "Nhóm kiểm tra", "Chứng từ liên quan", "Nguyên nhân", "Số chênh lệch", "Xử lý"],
                         [[SEV_LABEL[a.severity], a.group, a.voucher_label, a.message, a.difference,
-                          "Mở chứng từ ▸" if a.target and a.target[0] == "voucher" else "Mở sổ ▸"] for a in rows],
+                          {"voucher": "Mở chứng từ ▸", "costing": "Tính giá ▸"}.get(a.target[0] if a.target else "", "Mở sổ ▸")] for a in rows],
                         money_cols={4}, widths=[110, 230, 150, 520, 110, 100], keys=[i for i in range(len(rows))],
                         stretch_col=3)
         self._shown = rows
@@ -107,6 +107,10 @@ class AlertView(QWidget):
                           new_tab=True)
         elif t[0] == "opening_balance":
             self.ctx.open("c_opening")
+        elif t[0] == "opening_stock":
+            self.ctx.open("c_opening_stock")
+        elif t[0] == "costing":
+            self.ctx.open("m_tinhgia")
         elif t[0] == "trial_balance":
             self.ctx.open("r_cdps")
 
@@ -433,6 +437,25 @@ class CompanyView(QWidget):
         b.clicked.connect(self.save_company)
         b.setEnabled(self.s.user.can("admin"))
         f.addRow("", b)
+        from ketoan.services.inventory_service import METHODS, InventoryService
+        self.inv = InventoryService(self.s)
+        self.cb_cost = QComboBox()
+        for k, v in METHODS.items():
+            self.cb_cost.addItem(v, k)
+        self.cb_cost.setCurrentIndex(max(0, self.cb_cost.findData(self.inv.method())))
+        bm = tool_button("Áp dụng phương pháp", "check")
+        bm.clicked.connect(self.save_method)
+        bm.setEnabled(self.s.user.can("admin"))
+        row = QHBoxLayout()
+        row.addWidget(self.cb_cost)
+        row.addWidget(bm)
+        row.addStretch(1)
+        f.addRow("Tính giá xuất kho", row)
+        note = QLabel("Phương pháp tính giá phải áp dụng nhất quán trong năm tài chính; thay đổi được ghi nhật ký. "
+                      "Bình quân gia quyền cuối kỳ tính theo tháng, theo mã hàng + kho; FIFO theo ngày hạch toán.")
+        note.setObjectName("Hint")
+        note.setWordWrap(True)
+        f.addRow("", note)
         tabs.addTab(w1, "Thông tin doanh nghiệp")
         # --- chế độ kế toán (phiên bản)
         w2 = QWidget()
@@ -497,6 +520,13 @@ class CompanyView(QWidget):
         if ok:
             info(self, "Đã lưu thông tin doanh nghiệp.")
             self.ctx.company_info_changed()
+
+    def save_method(self):
+        if confirm(self, f"Áp dụng phương pháp «{self.cb_cost.currentText()}» cho doanh nghiệp?\n"
+                         "Nên chạy lại «Tính giá xuất kho» cho các tháng chưa khóa sau khi đổi."):
+            ok, _ = run(self, self.inv.set_method, self.cb_cost.currentData())
+            if ok:
+                info(self, "Đã cập nhật phương pháp tính giá xuất kho.")
 
     def apply_regime(self):
         if confirm(self, f"Áp dụng «{self.cb_reg.currentText()}» từ ngày {vn_date(self.reg_from.iso())}?"):
@@ -603,12 +633,17 @@ Chỉ chứng từ <b>Đã ghi sổ</b> mới lên sổ sách; mọi dòng sổ 
 <h3>Trạng thái chứng từ</h3>
 <p><b>Nháp</b> (vừa lưu, có thể còn lỗi) → <b>Đã kiểm tra</b> (không còn lỗi chặn) → <b>Đã ghi sổ</b> (đã lên sổ) →
 <b>Đã khóa kỳ</b> (kỳ đã khóa, không sửa/bỏ ghi sổ được). Sửa chứng từ đã ghi sổ: «Bỏ ghi sổ» trước.</p>
+<h3>Giai đoạn 2 (đã triển khai)</h3>
+<p>Quản lý công nợ (tổng hợp theo đối tượng/MST, chi tiết hóa đơn – hạn thanh toán, tuổi nợ, biên bản đối chiếu), tồn kho
+đầu kỳ, nhập – xuất – tồn, thẻ kho, <b>tính giá xuất kho</b> (bình quân gia quyền cuối tháng / FIFO, có xem trước),
+xuất kho hàng loạt từ bảng kê bán, đối chiếu doanh thu – giá vốn, đọc hóa đơn điện tử XML, cảnh báo tồn quỹ âm và
+bán hàng chưa ghi giá vốn.</p>
 <h3>Phạm vi giai đoạn 1</h3>
 <p>Đã triển khai: giao diện tổng quan, danh mục (kèm nhập Excel), số dư đầu kỳ, nhập chứng từ, kiểm tra, ghi sổ / bỏ ghi
 sổ, nhật ký chung, sổ cái, sổ chi tiết tài khoản, sổ quỹ, sổ tiền gửi, bảng cân đối số phát sinh, trung tâm cảnh báo, kết
 chuyển cuối kỳ (xem trước + hoàn tác), khóa kỳ, phân quyền, nhật ký thay đổi, sao lưu – khôi phục, xuất Excel/PDF/in.</p>
-<p>Các ô có nhãn <b>GĐ2/GĐ3</b> là chức năng chưa triển khai: công nợ chuyên sâu, kho (nhập – xuất – tồn, tính giá xuất
-kho), đọc hóa đơn XML (GĐ2); TSCĐ, CCDC, giá thành, báo cáo tài chính theo mẫu, hỗ trợ thuế (GĐ3).</p>
+<p>Các ô có nhãn <b>GĐ3</b> là chức năng chưa triển khai: TSCĐ, CCDC, giá thành, báo cáo tài chính theo mẫu, hỗ trợ
+thuế, in hồ sơ.</p>
 <h3>Lưu ý pháp lý</h3>
 <p>Chế độ kế toán, hệ thống tài khoản, thuế suất trong dữ liệu mẫu chưa được kiểm chứng; cần đối chiếu văn bản gốc
 trước khi áp dụng. Báo cáo của ứng dụng là báo cáo hỗ trợ tính toán, không phải tờ khai điện tử theo cấu trúc của cơ

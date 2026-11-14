@@ -76,7 +76,7 @@ class Tile(QAbstractButton):
         self.setCursor(Qt.PointingHandCursor)
         self.setFocusPolicy(Qt.StrongFocus)
         tip = func.title
-        if func.phase > 1:
+        if func.pending:
             tip += f"\nCHƯA TRIỂN KHAI – Giai đoạn {func.phase}. Bấm để xem phạm vi dự kiến."
         self.setToolTip(tip)
         self.setAccessibleName(func.title)
@@ -94,7 +94,7 @@ class Tile(QAbstractButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
         base = QColor(theme.TILE_COLORS[self.func.color])
-        pending = self.func.phase > 1
+        pending = self.func.pending
         if pending:
             base = QColor.fromHsv(base.hsvHue(), int(base.hsvSaturation() * 0.45), min(255, base.value() + 40))
         if self._hover or self.hasFocus():
@@ -108,7 +108,7 @@ class Tile(QAbstractButton):
             p.drawPath(path)
         p.drawPixmap(8, (TILE_H - 24) // 2, icons.pixmap(self.func.icon, "#FFFFFF", 24))
         p.setPen(QColor("#FFFFFF"))
-        text_rect = QRect(38, 2, TILE_W - 42 - (20 if self.func.phase > 1 else 0), TILE_H - 4)
+        text_rect = QRect(38, 2, TILE_W - 42 - (20 if self.func.pending else 0), TILE_H - 4)
         f = QFont(self.font())
         f.setBold(True)
         for size in (8.2, 7.6, 7.0, 6.6):      # tự co chữ để tên dài vẫn hiển thị đầy đủ
@@ -224,7 +224,7 @@ class Dashboard(QWidget):
         two.addWidget(TileGroup(g[2][0], g[2][1], self.ctx.open), 5)
         two.addWidget(TileGroup(g[3][0], g[3][1], self.ctx.open), 4)
         lay.addLayout(two)
-        legend = QLabel("Ô màu nhạt có nhãn <b>GĐ2/GĐ3</b>: chức năng chưa triển khai, bấm để xem phạm vi dự kiến. "
+        legend = QLabel("Ô màu nhạt có nhãn <b>GĐ3</b>: chức năng chưa triển khai, bấm để xem phạm vi dự kiến. "
                         "Phím tắt: F5 cập nhật · Ctrl+W đóng tab · Ctrl+Tab chuyển tab · F1 trợ giúp.")
         legend.setObjectName("Hint")
         lay.addWidget(legend)

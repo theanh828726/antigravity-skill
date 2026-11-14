@@ -32,7 +32,7 @@ Script tự: tạo `.venv` → cài thư viện → **chạy kiểm thử (dừn
 Kết quả: `dist\UngDungKeToan\UngDungKeToan.exe`.
 
 Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
-`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.0.0-gd1.exe`.
+`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.1.0-gd2.exe`.
 
 ## Dữ liệu, sao lưu, bảo mật
 | Mục | Vị trí / cách làm |
@@ -51,7 +51,19 @@ Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
 2. *Cài đặt* → cập nhật thông tin doanh nghiệp, chọn **chế độ kế toán + ngày hiệu lực** (sau khi đã kiểm chứng văn bản).
 3. *Danh mục* → rà soát hệ thống tài khoản; nhập khách hàng, NCC, vật tư… bằng *Nhập Excel* (có ánh xạ cột, kiểm tra trước).
 4. *Danh mục → Số dư đầu kỳ* → nhập số dư đầu năm, bảo đảm *Cân đối ✓*.
-5. Nhập chứng từ → Kiểm tra (F6) → Ghi sổ (F9) → xem sổ, CĐSPS → Trung tâm cảnh báo → Kết chuyển → Khóa kỳ.
+5. *Danh mục → Tồn kho đầu kỳ* → nhập số lượng, giá trị tồn đầu theo mã hàng + kho (khớp số dư TK kho).
+6. *Cài đặt* → chọn **phương pháp tính giá xuất kho** (bình quân gia quyền cuối tháng hoặc FIFO), dùng nhất quán cả năm.
+7. Hằng tháng: nhập chứng từ (hoặc *Đọc hóa đơn XML*) → Kiểm tra (F6) → Ghi sổ (F9) → *Xuất kho hàng loạt* cho bảng kê bán →
+   **Tính giá xuất kho** → *Đối chiếu doanh thu – giá vốn* → Trung tâm cảnh báo → Kết chuyển → Khóa kỳ.
+
+## Nâng cấp từ bản Giai đoạn 1
+Mở file dữ liệu cũ bằng bản mới: ứng dụng **tự nâng cấp lược đồ** (thêm hạn thanh toán, liên kết chứng từ, tồn kho đầu
+kỳ, phương pháp tính giá) trong một giao dịch; hạn thanh toán của chứng từ mua/bán cũ được tính = ngày hóa đơn + hạn TT
+của đối tượng. Nên **sao lưu trước khi nâng cấp**. Bản cũ không mở được dữ liệu đã nâng cấp.
+
+## Hóa đơn XML mẫu
+`sample_data/hoa_don_xml/` có 4 file minh họa: hóa đơn mua hợp lệ, hóa đơn từ nhà cung cấp mới có lệch làm tròn thuế 1đ,
+hóa đơn bán đã nhập (phát hiện trùng), hóa đơn không thuộc doanh nghiệp. Mở bằng *Chứng từ nghiệp vụ → Đọc hóa đơn XML*.
 
 ## Xử lý sự cố
 | Hiện tượng | Cách xử lý |

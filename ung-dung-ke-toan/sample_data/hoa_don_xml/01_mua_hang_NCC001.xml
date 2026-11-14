@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon Id="data"><TTChung><PBan>2.0.0</PBan><THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon><KHMSHDon>1</KHMSHDon>
+<KHHDon>1C26TAA</KHHDon><SHDon>0000199</SHDon><NLap>2026-11-10</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung>
+<NDHDon><NBan><Ten>Công ty TNHH Phân phối Thiết bị Số (minh họa)</Ten><MST>0109990201</MST><DChi>Hà Nội</DChi></NBan>
+<NMua><Ten>Công ty TNHH Thương mại – Dịch vụ Minh Khang (minh họa)</Ten><MST>0109990001</MST><DChi>Số 18 phố Minh Họa, quận Cầu Giấy, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><MHHDVu>HH004</MHHDVu><THHDVu>Chuột không dây</THHDVu>
+<DVTinh>Chiếc</DVTinh><SLuong>50</SLuong><DGia>235000</DGia><ThTien>11750000</ThTien>
+<TSuat>10%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><MHHDVu>HH006</MHHDVu><THHDVu>Giấy A4 70gsm</THHDVu>
+<DVTinh>Ram</DVTinh><SLuong>100</SLuong><DGia>63000</DGia><ThTien>6300000</ThTien>
+<TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>18050000</TgTCThue><TgTThue>1805000</TgTThue><TgTTTBSo>19855000</TgTTTBSo></TToan></NDHDon></DLHDon>
+<DSCKS><NBan>(chữ ký số – không kiểm tra trong ứng dụng)</NBan></DSCKS></HDon>
