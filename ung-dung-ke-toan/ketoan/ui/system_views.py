@@ -642,8 +642,13 @@ bán hàng chưa ghi giá vốn.</p>
 <p>Đã triển khai: giao diện tổng quan, danh mục (kèm nhập Excel), số dư đầu kỳ, nhập chứng từ, kiểm tra, ghi sổ / bỏ ghi
 sổ, nhật ký chung, sổ cái, sổ chi tiết tài khoản, sổ quỹ, sổ tiền gửi, bảng cân đối số phát sinh, trung tâm cảnh báo, kết
 chuyển cuối kỳ (xem trước + hoàn tác), khóa kỳ, phân quyền, nhật ký thay đổi, sao lưu – khôi phục, xuất Excel/PDF/in.</p>
-<p>Các ô có nhãn <b>GĐ3</b> là chức năng chưa triển khai: TSCĐ, CCDC, giá thành, báo cáo tài chính theo mẫu, hỗ trợ
-thuế, in hồ sơ.</p>
+<h3>Giai đoạn 3 (đã triển khai)</h3>
+<p>Tài sản cố định (khấu hao đường thẳng theo tháng, ghi giảm), công cụ dụng cụ và chi phí trả trước (phân bổ đều), giá thành
+(giản đơn, không dở dang, theo định mức, không định mức, công trình, dịch vụ, vận tải; sổ chi tiết công trình), báo cáo tài
+chính theo <b>mẫu quản lý phiên bản</b> (nhập mẫu từ Excel, công thức theo TK, truy ngược sổ), báo cáo hỗ trợ thuế GTGT, TNDN,
+TNCN và đối chiếu hóa đơn – sổ, in hồ sơ PDF hàng loạt, chuyển số dư cuối năm.</p>
+<p><b>Báo cáo tài chính:</b> ứng dụng chưa có mẫu đã kiểm chứng theo văn bản chính thức; mẫu đi kèm chỉ là mẫu thử nghiệm kỹ thuật và
+luôn mang cảnh báo «CHƯA KIỂM CHỨNG». Các ô nhãn <b>GĐ4</b> (Thuyết minh báo cáo tài chính) chưa triển khai.</p>
 <h3>Lưu ý pháp lý</h3>
 <p>Chế độ kế toán, hệ thống tài khoản, thuế suất trong dữ liệu mẫu chưa được kiểm chứng; cần đối chiếu văn bản gốc
 trước khi áp dụng. Báo cáo của ứng dụng là báo cáo hỗ trợ tính toán, không phải tờ khai điện tử theo cấu trúc của cơ

@@ -225,16 +225,21 @@ def _seed_demo(db: Database, admin: CurrentUser):
                                        ("CP04", "Văn phòng phẩm"), ("CP05", "Vận chuyển"), ("CP06", "Phí ngân hàng"),
                                        ("CP07", "Phân bổ chi phí trả trước")], ["code", "name"])
         _ins(db, "fixed_asset", cid, [
-            ("TS001", "Xe ô tô tải 1,5 tấn", "2111", "2141", "6421", 480_000_000, "2024-01-01", 96, "KD"),
-            ("TS002", "Hệ thống máy chủ văn phòng", "2111", "2141", "6422", 200_000_000, "2024-07-01", 60, "KT"),
+            ("TS001", "Xe ô tô tải 1,5 tấn", "2111", "2141", "6421", 480_000_000, "2024-01-01", 96, "KD", 120_000_000),
+            ("TS002", "Hệ thống máy chủ văn phòng", "2111", "2141", "6422", 200_000_000, "2024-07-01", 60, "KT", 60_000_000),
         ], ["code", "name", "asset_account", "depreciation_account", "expense_account", "original_cost", "start_date",
-            "useful_months", "department"])
+            "useful_months", "department", "accumulated_opening"])
+        _ins(db, "prepaid_item", cid, [
+            ("CP001", "Tiền thuê văn phòng trả trước 12 tháng", "CPTT", "242", "6422", 36_000_000, "2026-01-01", 12, 0, "KT"),
+            ("CC001", "Bộ bàn ghế phòng họp", "CCDC", "153", "6422", 24_000_000, "2026-08-01", 12, 0, "KT"),
+        ], ["code", "name", "kind", "source_account", "expense_account", "total_amount", "start_date", "months",
+            "allocated_opening", "department"])
         pid = {r["code"]: r["id"] for r in db.query("SELECT id, code FROM partner WHERE company_id=?", (cid,))}
         ob = [("1111", None, 185_000_000, 0), ("1121", None, 1_672_800_000, 0), ("156", None, 9_200_000, 0), ("131", pid["KH001"], 120_000_000, 0),
               ("131", pid["KH002"], 85_500_000, 0), ("2111", None, 680_000_000, 0), ("242", None, 36_000_000, 0),
-              ("2141", None, 0, 136_000_000), ("331", pid["NCC001"], 0, 158_000_000),
+              ("2141", None, 0, 180_000_000), ("331", pid["NCC001"], 0, 158_000_000),
               ("331", pid["NCC002"], 0, 64_000_000), ("334", None, 0, 92_000_000), ("33311", None, 0, 28_500_000),
-              ("4111", None, 0, 1_800_000_000), ("4211", None, 0, 510_000_000)]
+              ("4111", None, 0, 1_800_000_000), ("4211", None, 0, 466_000_000)]
         db.executemany("INSERT INTO opening_balance(company_id, year, account_code, partner_id, debit, credit) "
                        "VALUES(?,?,?,?,?,?)", [(cid, 2026, *x) for x in ob])
         # tồn kho đầu kỳ chi tiết – khớp số dư đầu năm TK 156
@@ -244,6 +249,8 @@ def _seed_demo(db: Database, admin: CurrentUser):
 
     from ketoan.services.inventory_service import InventoryService
     vs, cs, ps, inv = VoucherService(s), ClosingService(s), PeriodService(s), InventoryService(s)
+    from ketoan.services.asset_service import AssetService, PrepaidService
+    assets, prepaids = AssetService(s), PrepaidService(s)
 
     def mk(vtype, d, lines, partner=None, desc="", inv=None, series=None, post=True, check=False, **kw):
         tax = db.scalar("SELECT tax_code FROM partner WHERE company_id=? AND code=?", (cid, partner)) if partner else None
@@ -360,14 +367,6 @@ def _seed_demo(db: Database, admin: CurrentUser):
              "amount": 38_000_000, "department": "KD", "expense_item": "CP01"},
             {"description": "Lương bộ phận quản lý", "debit_account": "6422", "credit_account": "334",
              "amount": 30_000_000, "department": "BGD", "expense_item": "CP01"}], None, f"Hạch toán lương tháng {m:02d}")
-        mk("PKT", last, [
-            {"description": "Khấu hao xe ô tô tải", "debit_account": "6421", "credit_account": "2141",
-             "amount": 5_000_000, "department": "KD", "expense_item": "CP02"},
-            {"description": "Khấu hao hệ thống máy chủ", "debit_account": "6422", "credit_account": "2141",
-             "amount": 3_333_333, "department": "KT", "expense_item": "CP02"},
-            {"description": "Phân bổ chi phí trả trước", "debit_account": "6422", "credit_account": "242",
-             "amount": 3_000_000, "department": "KT", "expense_item": "CP07"}], None,
-           f"Khấu hao, phân bổ tháng {m:02d} (nhập tay – tự động ở GĐ3)")
         mk("NH", last, [{"description": "Phí quản lý tài khoản", "debit_account": "6422", "credit_account": "1121",
                          "amount": 330_000, "expense_item": "CP06"},
                         {"description": "Lãi tiền gửi không kỳ hạn", "debit_account": "1121", "credit_account": "515",
@@ -390,9 +389,25 @@ def _seed_demo(db: Database, admin: CurrentUser):
                                       "amount": 1_250_000, "expense_item": "CP04"}], None,
                "Chi văn phòng phẩm (nhập sót, chưa ghi sổ)", post=False)
         # Kết chuyển các tháng 1–6 rồi khóa sổ
-        if m <= 6:   # tính giá xuất kho bình quân cuối tháng → kết chuyển (các tháng 7–10 để người dùng tự chạy)
+        if m <= 6:   # khấu hao, phân bổ, tính giá xuất kho, kết chuyển – tháng 7–10 để người dùng tự chạy
+            assets.apply(2026, m, post=True)
+            prepaids.apply(2026, m, post=True)
             inv.costing_apply(f"2026-{m:02d}-01", last)
             cs.execute(f"2026-{m:02d}-01", last)
+
+    # ---- CCDC mua tháng 7 (phân bổ 12 tháng từ 08/2026) và lương nhân viên minh họa cho báo cáo TNCN
+    mk("PC", "2026-07-20", [{"description": "Mua bộ bàn ghế phòng họp", "debit_account": "153", "credit_account": "1111",
+                             "amount": 24_000_000}], "NCC001", "Mua CCDC bộ bàn ghế phòng họp")
+    mk("PKT", "2026-10-31", [
+        {"description": "Lương nhân viên NV001", "debit_account": "6422", "credit_account": "334", "credit_partner": "NV001",
+         "amount": 30_000_000, "department": "BGD", "expense_item": "CP01"},
+        {"description": "Lương nhân viên NV004", "debit_account": "6422", "credit_account": "334", "credit_partner": "NV004",
+         "amount": 20_000_000, "department": "KT", "expense_item": "CP01"},
+        {"description": "Thuế TNCN khấu trừ NV001 (số liệu giả định do kế toán nhập)", "debit_account": "334",
+         "debit_partner": "NV001", "credit_account": "3335", "credit_partner": "NV001", "amount": 1_500_000},
+        {"description": "Thuế TNCN khấu trừ NV004 (số liệu giả định do kế toán nhập)", "debit_account": "334",
+         "debit_partner": "NV004", "credit_account": "3335", "credit_partner": "NV004", "amount": 500_000}],
+       None, "Lương tháng 10 theo nhân viên (minh họa báo cáo TNCN – số liệu giả định)")
 
     # ---- Tình huống minh họa cho Trung tâm cảnh báo (tháng 10–11/2026)
     mk("PXK", "2026-10-28", [{"description": "Xuất máy in trưng bày", "debit_account": "6421", "credit_account": "156",
@@ -436,8 +451,11 @@ def _seed_demo(db: Database, admin: CurrentUser):
         _ins(db, "partner", cid2, [("CDT01", "Ban QLDA Giao thông Minh Họa", "KH", "0109990301"),
                                    ("NCC01", "Công ty TNHH Vật liệu Xây dựng Minh Họa", "NCC", "0109990302")],
              ["code", "name", "kind", "tax_code"])
-        _ins(db, "project", cid2, [("CT01", "Đường liên xã Minh Họa – gói 01", "Ban QLDA Giao thông Minh Họa")],
+        _ins(db, "project", cid2, [("CT01", "Đường liên xã Minh Họa – gói 01", "Ban QLDA Giao thông Minh Họa"),
+                                   ("CT02", "Kè bờ sông Minh Họa – hạng mục 1", "Ban QLDA Giao thông Minh Họa")],
              ["code", "name", "customer"])
+        _ins(db, "expense_item", cid2, [("CP01", "Nguyên vật liệu trực tiếp"), ("CP02", "Nhân công trực tiếp"),
+                                        ("CP03", "Máy thi công, thuê ngoài"), ("CP04", "Chi phí chung")], ["code", "name"])
         _ins(db, "warehouse", cid2, [("KCT", "Kho công trường", "Bắc Ninh")], ["code", "name", "address"])
         _ins(db, "item", cid2, [("XM", "Xi măng PCB40", "Tấn", "VT", "152", "10"),
                                 ("THEP", "Thép cuộn D8", "Tấn", "VT", "152", "10")],
@@ -459,10 +477,26 @@ def _seed_demo(db: Database, admin: CurrentUser):
     v = vs2.save({"vtype": "PXK", "voucher_date": "2026-03-10", "posting_date": "2026-03-10",
                   "description": "Xuất vật liệu thi công CT01"},
                  [{"description": "Xuất xi măng", "debit_account": "154", "credit_account": "152", "item": "XM",
-                   "warehouse": "KCT", "quantity": 100, "unit_price": 1_450_000, "project": "CT01"},
+                   "warehouse": "KCT", "quantity": 100, "unit_price": 1_450_000, "project": "CT01", "expense_item": "CP01"},
                   {"description": "Xuất thép", "debit_account": "154", "credit_account": "152", "item": "THEP",
-                   "warehouse": "KCT", "quantity": 30, "unit_price": 15_800_000, "project": "CT01"}])
+                   "warehouse": "KCT", "quantity": 30, "unit_price": 15_800_000, "project": "CT01", "expense_item": "CP01"}])
     vs2.post(v)
+    v = vs2.save({"vtype": "PKT", "voucher_date": "2026-03-20", "posting_date": "2026-03-20",
+                  "description": "Chi phí nhân công, máy thi công, chi phí chung tháng 03/2026"},
+                 [{"description": "Nhân công trực tiếp CT01", "debit_account": "154", "credit_account": "334", "amount": 85_000_000,
+                   "project": "CT01", "expense_item": "CP02"},
+                  {"description": "Thuê máy thi công CT01", "debit_account": "154", "credit_account": "331", "credit_partner": "NCC01",
+                   "amount": 12_000_000, "project": "CT01", "expense_item": "CP03"},
+                  {"description": "Thuê ngoài thi công kè CT02", "debit_account": "154", "credit_account": "331", "credit_partner": "NCC01",
+                   "amount": 20_000_000, "project": "CT02", "expense_item": "CP03"},
+                  {"description": "Nhân công trực tiếp CT02", "debit_account": "154", "credit_account": "334", "amount": 30_000_000,
+                   "project": "CT02", "expense_item": "CP02"},
+                  {"description": "Chi phí chung chưa phân bổ đối tượng", "debit_account": "154", "credit_account": "334",
+                   "amount": 6_000_000, "expense_item": "CP04"}])
+    vs2.post(v)
+    # mẫu báo cáo thử nghiệm kỹ thuật (CHƯA KIỂM CHỨNG) cho doanh nghiệp minh họa 1
+    from ketoan.services.report_engine import ReportEngine
+    ReportEngine(s).seed_demo_templates()
     return db
 
 

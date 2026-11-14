@@ -389,6 +389,9 @@ class MainWindow(QMainWindow):
         self.open("dashboard")
         self.sidebar.select(0)
 
+    def reload_years(self):
+        self._load_years()
+
     def company_info_changed(self):
         idx = self.cb_company.findData(self.session.company_id)
         self.cb_company.setItemText(idx, self.session.company["name"])
@@ -589,6 +592,29 @@ class MainWindow(QMainWindow):
             return p2.RevenueCogsView(self)
         if key == "c_import_xml":
             return p2.XmlInvoiceView(self)
+        from ketoan.ui import phase3_report_views as p3r, phase3_views as p3
+        if key == "m_tscd":
+            return p3.AssetView(self)
+        if key == "m_ccdc":
+            return p3.PrepaidView(self)
+        if key in ("gt_ct", "gt_dm", "gt_kdm", "gt_gd", "gt_dv", "gt_vt", "gt_kdd"):
+            return p3.CostView(self, key)
+        if key == "gt_sct":
+            return p3.ProjectLedgerView(self, args.get("project_id"), args.get("d_from"), args.get("d_to"))
+        if key == "m_inhs":
+            return p3.PrintPackView(self)
+        if key == "s_yearend":
+            return p3.YearEndView(self)
+        if key in ("bc_cdkt", "bc_kqkd", "bc_lctt"):
+            return p3r.FinStatementView(self, {"bc_cdkt": "BS", "bc_kqkd": "IS", "bc_lctt": "CF"}[key])
+        if key == "t_gtgt":
+            return p3r.VatView(self)
+        if key == "t_doichieu":
+            return p3r.InvoiceReconView(self)
+        if key == "t_tndn":
+            return p3r.TndnView(self)
+        if key == "t_tncn":
+            return p3r.TncnView(self)
         if key == "s_alerts":
             return sv.AlertView(self)
         if key == "s_lock":

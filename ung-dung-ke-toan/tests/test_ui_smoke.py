@@ -244,3 +244,86 @@ def test_phase2_screens(window, tmp_path):
     assert form.data["invoice_no"] == "0000199" and form.ed_due.isVisible()
     shot(w, "30_chung_tu_tu_xml")
     assert not w._warnings, w._warnings
+
+
+def test_phase3_screens(window, tmp_path, monkeypatch):
+    from PySide6.QtCore import Qt as _Qt
+    from ketoan.ui.phase3_report_views import TemplateManager
+    w = window
+    # --- TSCĐ: danh sách, chạy khấu hao tháng 7, hoàn tác
+    av = w.open("m_tscd")
+    assert av.table.rowCount() == 3
+    shot(w, "40_tscd_danh_sach")
+    av.tabs.setCurrentIndex(1)
+    rt = av.run_tab
+    rt.cb_month.setCurrentIndex(6)
+    rt.refresh()
+    assert rt.table.rowCount() == 3
+    shot(w, "41_khau_hao_thang")
+    rt.chk_post.setChecked(True)
+    rt.apply()
+    assert rt.hist.rowCount() == 7      # tháng 1–6 đã chạy sẵn trong dữ liệu mẫu + tháng 7 vừa chạy
+    assert w.session.db.scalar("SELECT v.status FROM period_run r JOIN voucher v ON v.id=r.voucher_id WHERE r.kind='ASSET' AND r.month=7") == "POSTED"
+    w.tabs.setCurrentWidget(av)
+    rt.hist.selectRow(0)
+    rt.undo()
+    assert rt.hist.rowCount() == 6
+    pv = w.open("m_ccdc")
+    assert pv.table.rowCount() == 3
+    shot(w, "42_ccdc_chi_phi_tra_truoc")
+    # --- Giá thành (DN 2 – xây dựng): nhập SL, dở dang → lưu → chứng từ nháp
+    w.cb_company.setCurrentIndex(1)
+    w._company_selected(1)
+    cv = w.open("gt_ct")
+    cv.d_from.set_iso("2026-03-01")
+    cv.d_to.set_iso("2026-03-31")
+    cv.calc()
+    assert len(cv.rows) == 2
+    qty_col, we_col = cv.c_qty, cv.c_we
+    cv.table.item(0, qty_col).setText("2")
+    cv.table.item(0, we_col).setText("100.000.000")
+    assert cv.rows[0].total == 616_000_000 and cv.table.item(0, cv.c_total).text() == "616.000.000"
+    shot(w, "43_gia_thanh_cong_trinh")
+    cv.save()
+    assert w.tabs.currentWidget().data["status"] == "DRAFT"
+    cv2 = w.open("gt_kdm")
+    cv2.d_from.set_iso("2026-03-01"); cv2.d_to.set_iso("2026-03-31"); cv2.calc()
+    assert cv2.c_common is not None
+    shot(w, "44_gia_thanh_khong_dinh_muc")
+    sct = w.open("gt_sct", project_id=cv.rows[0].project_id, d_from="2026-03-01", d_to="2026-03-31", new_tab=True)
+    assert sct.table.rowCount() > 3
+    shot(w, "45_so_chi_tiet_cong_trinh")
+    w.cb_company.setCurrentIndex(0)
+    w._company_selected(0)
+    # --- Báo cáo tài chính theo mẫu + quản lý mẫu
+    bs = w.open("bc_cdkt")
+    assert bs.table.rowCount() >= 15 and "CHƯA KIỂM CHỨNG" in bs.banner.text()
+    assert bs.footer.text().startswith("Nhấp đúp") or "lệch" not in bs.footer.text()
+    shot(w, "46_bang_can_doi_mau_thu_nghiem")
+    w.open("bc_kqkd")
+    shot(w, "47_ket_qua_kinh_doanh_mau_thu_nghiem")
+    cf = w.open("bc_lctt")
+    assert "Chưa có mẫu" in cf.banner.text()
+    mgr = TemplateManager(w, w)
+    mgr.show()
+    if SHOTS:
+        QApplication.processEvents()
+        mgr.grab().save(os.path.join(SHOTS, "48_quan_ly_mau_bao_cao.png"))
+    mgr.close()
+    # --- Thuế hỗ trợ
+    for key, name in (("t_gtgt", "49_thue_gtgt"), ("t_doichieu", "50_doi_chieu_hoa_don"), ("t_tndn", "51_thue_tndn_tam_tinh"), ("t_tncn", "52_thue_tncn_tong_hop")):
+        w.open(key)
+        shot(w, name)
+    # --- In hồ sơ, chuyển số dư cuối năm
+    pp = w.open("m_inhs")
+    pp.folder.setText(str(tmp_path / "hs"))
+    pp.checks["chungtu"].setChecked(False)
+    pp.export()
+    files = sorted((tmp_path / "hs").glob("*.pdf"))
+    assert len(files) >= 5 and all(f.read_bytes()[:4] == b"%PDF" for f in files) and (tmp_path / "hs" / "00_MUC_LUC.txt").exists()
+    shot(w, "53_in_ho_so")
+    ye = w.open("s_yearend")
+    assert ye.pv["problems"]
+    shot(w, "54_chuyen_so_du_cuoi_nam")
+    assert not w._warnings, w._warnings
+    _ = _Qt

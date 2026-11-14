@@ -1,8 +1,12 @@
 # Ứng dụng Kế toán – Hocviendaotaoai
 
 Phần mềm kế toán Windows (Python + PySide6) cho doanh nghiệp thương mại, dịch vụ, sản xuất, xây dựng, vận tải.
-**Bản hiện tại: Giai đoạn 2 (v1.1.0)** – Giai đoạn 1 + công nợ, tiền mặt – ngân hàng, mua bán hàng, nhập – xuất – tồn,
-tính giá xuất kho. Chạy được, có dữ liệu minh họa liên kết đầy đủ.
+**Bản hiện tại: Giai đoạn 3 (v1.2.0)** – Giai đoạn 1 và 2 + tài sản cố định, công cụ dụng cụ, giá thành, báo cáo tài chính theo mẫu
+quản lý phiên bản, báo cáo hỗ trợ thuế, in hồ sơ, chuyển số dư cuối năm. Chạy được, có dữ liệu minh họa liên kết đầy đủ.
+
+> **Lưu ý pháp lý quan trọng:** ứng dụng **không có mẫu báo cáo tài chính nào đã được kiểm chứng** theo văn bản chính thức (không lấy được
+> toàn văn phụ lục mẫu từ nguồn chính thức trong quá trình phát triển). Bộ máy báo cáo cho phép nhập mẫu đã kiểm chứng; mẫu đi kèm chỉ để thử
+> nghiệm kỹ thuật và luôn hiển thị «CHƯA KIỂM CHỨNG». Báo cáo thuế chỉ là báo cáo hỗ trợ tính toán, không phải tờ khai điện tử.
 
 ```
 Danh mục → Nhập chứng từ → Kiểm tra → Ghi sổ → Công nợ, kho (GĐ2) → giá thành (GĐ3) → Sổ kế toán → Báo cáo
@@ -49,6 +53,13 @@ Tùy chọn: `--db <file.db>` mở file chỉ định · `--reset-demo` tạo l�
 | Tính giá xuất kho | **Bình quân gia quyền cuối tháng** hoặc **FIFO** theo mã hàng + kho; bảng xem trước (tồn đầu, nhập, xuất cũ/mới, chênh lệch, cảnh báo) → xác nhận → cập nhật dòng xuất và ghi lại sổ trong một giao dịch; chạy lại không thay đổi kết quả. Phạm vi ghi rõ trên màn hình | ✅ GĐ2 |
 | Mua – bán | **Đọc hóa đơn XML** (nhận diện mua vào/bán ra theo MST, khớp đối tượng & mã hàng, đối chiếu tổng tiền/thuế, phát hiện trùng, tạo đối tượng mới khi xác nhận) → tạo chứng từ **nháp**; **Xuất kho hàng loạt** từ bảng kê bán (liên kết chứng từ nguồn, không lập trùng); **Đối chiếu doanh thu – giá vốn** theo mặt hàng | ✅ GĐ2 |
 | Cảnh báo bổ sung | Tồn quỹ tiền mặt âm, bán hàng chưa xuất kho/giá vốn, hàng hết SL còn giá trị (cần tính giá), tồn kho đầu kỳ lệch số dư TK kho; tồn âm có tính tồn đầu kỳ | ✅ GĐ2 |
+| TSCĐ | Danh mục + nguyên giá, hao mòn lũy kế, giá trị còn lại; **khấu hao đường thẳng theo tháng** (xem trước → chạy → chứng từ hạch toán nháp/ghi sổ → hoàn tác); tháng cuối nhận phần dư; ghi giảm ngừng khấu hao từ tháng sau | ✅ GĐ3 |
+| CCDC, chi phí trả trước | Khai báo (TK nguồn, TK chi phí, số tháng, đã phân bổ đầu kỳ); phân bổ đều hàng tháng với cùng cơ chế xem trước/chạy/hoàn tác | ✅ GĐ3 |
+| Giá thành | Một bộ máy tập hợp chi phí TK 154 theo công trình/đối tượng: **giản đơn, không dở dang, theo định mức, không định mức (phân bổ chi phí chung theo CP trực tiếp)**, các ô công trình/dịch vụ/vận tải/sản xuất; dở dang cuối kỳ → đầu kỳ sau; kết chuyển giá thành tạo chứng từ nháp, hoàn tác được; **sổ chi tiết công trình** theo khoản mục | ✅ GĐ3 |
+| Báo cáo tài chính | **Bộ máy mẫu có phiên bản**: nhập mẫu từ Excel (mã – chỉ tiêu – công thức theo TK: DN/CN/DNDK/CNDK/PSN/PSC/PSNDU/PSCDU), kiểm tra cú pháp – tham chiếu – vòng lặp, cột Đầu năm, truy ngược chỉ tiêu → sổ chi tiết → chứng từ, xác nhận kiểm chứng kèm căn cứ (quyền quản trị), cảnh báo trên mọi bản xem/in/xuất khi chưa kiểm chứng. Dùng cho BS / KQKD / LCTT | ✅ GĐ3 (mẫu chính thức: **người dùng nhập**) |
+| Hỗ trợ thuế | **GTGT**: bảng kê mua vào/bán ra theo thuế suất người dùng chọn trên dòng, tổng hợp, đối chiếu thuế trên hóa đơn với bút toán sổ; **Đối chiếu hóa đơn – sổ**: lệch thuế, thiếu thông tin, trùng hóa đơn, lệch kỳ; **TNDN tạm tính**: lợi nhuận kế toán từ sổ, điều chỉnh và thuế suất do người dùng nhập kèm căn cứ (chưa nhập thuế suất thì không tính); **TNCN**: tổng hợp thu nhập và thuế đã khấu trừ theo nhân viên (chưa tính biểu thuế) | ✅ GĐ3 (hỗ trợ tính toán) |
+| In hồ sơ, cuối năm | In hàng loạt PDF (CĐSPS, nhật ký chung, sổ cái, sổ quỹ, sổ TGNH, từng chứng từ) kèm mục lục, có nhật ký; **chuyển số dư cuối năm** (số dư theo đối tượng + tồn kho, 4212 → 4211, kiểm tra đã kết chuyển/tồn âm/kỳ khóa) | ✅ GĐ3 |
+| Chưa triển khai (GĐ4) | Thuyết minh báo cáo tài chính (cần mẫu đã kiểm chứng); tờ khai điện tử theo cấu trúc cơ quan thuế; biểu thuế TNCN; đa người dùng PostgreSQL; chi phí sản xuất chung tự động (TK 621/622/627) | ⏳ ô «Thuyết minh» nhãn **GĐ4** |
 | Nâng cấp dữ liệu | Migration lược đồ theo phiên bản: file dữ liệu GĐ1 (và bản sao lưu cũ khi khôi phục) tự nâng cấp trong một giao dịch | ✅ GĐ2 |
 | GĐ3 | TSCĐ (khấu hao), CCDC (phân bổ), giá thành (8 loại), BCTC theo mẫu, hỗ trợ thuế GTGT/TNDN/TNCN, in hồ sơ | ⏳ ô hiển thị nhãn **GĐ3**, mở ra trang mô tả phạm vi – không giả lập |
 
@@ -77,11 +88,16 @@ ung-dung-ke-toan/
 │   │   ├── debt_service.py       # GĐ2: công nợ, hạn thanh toán, tuổi nợ, đối chiếu
 │   │   ├── trade_service.py      # GĐ2: xuất kho hàng loạt, đối chiếu doanh thu – giá vốn
 │   │   ├── xml_invoice.py        # GĐ2: đọc hóa đơn điện tử XML
+│   │   ├── asset_service.py      # GĐ3: TSCĐ, CCDC – khấu hao / phân bổ
+│   │   ├── cost_service.py       # GĐ3: giá thành, sổ chi tiết công trình
+│   │   ├── report_engine.py      # GĐ3: mẫu báo cáo có phiên bản + bộ tính công thức
+│   │   ├── tax_service.py        # GĐ3: báo cáo hỗ trợ thuế
+│   │   ├── yearend_service.py    # GĐ3: chuyển số dư cuối năm
 │   │   ├── period_service.py     # năm tài chính, khóa kỳ
 │   │   └── system_service.py     # doanh nghiệp, chế độ KT, số dư đầu, sao lưu, nhật ký
 │   ├── reports/export.py         # Excel / PDF / in
 │   └── ui/                       # PySide6 – chỉ gọi services, không viết SQL
-├── tests/                        # 28 kiểm thử: nghiệp vụ GĐ1 + GĐ2 + giao diện offscreen
+├── tests/                        # 41 kiểm thử: nghiệp vụ GĐ1–GĐ3 + giao diện offscreen
 ├── sample_data/                  # ketoan_demo.db + hoa_don_xml/ (4 hóa đơn XML mẫu)
 ├── packaging/                    # PyInstaller spec, build_windows.bat, Inno Setup
 └── docs/                         # hướng dẫn cài đặt, kết quả kiểm tra, ảnh màn hình
@@ -94,7 +110,7 @@ ung-dung-ke-toan/
 - Mọi thao tác ghi nằm trong `Database.transaction()` (BEGIN IMMEDIATE … COMMIT/ROLLBACK) – lưu đủ hoặc hoàn tác đủ; ghi sổ có chốt chặn cuối kiểm tra tổng Nợ = tổng Có.
 - Thuế GTGT trên bảng kê mua/bán được sinh bút toán riêng (Nợ 1331 / Có TK đối ứng; Nợ TK đối ứng / Có 33311).
 - Phiếu xuất kho liên kết bảng kê bán qua `voucher.source_voucher_id`; tính giá xuất kho chỉ sửa dòng xuất của kỳ chưa khóa và ghi lại sổ của chứng từ đó trong cùng giao dịch.
-- **Đa người dùng qua LAN**: không chia sẻ file SQLite qua mạng. Lớp `Database` có giao diện `query/execute/transaction` để thay bằng PostgreSQL (chưa triển khai – đề xuất làm cùng GĐ3).
+- **Đa người dùng qua LAN**: không chia sẻ file SQLite qua mạng. Lớp `Database` có giao diện `query/execute/transaction` để thay bằng PostgreSQL (chưa triển khai – GĐ4).
 
 ## 4. Chế độ kế toán & quy định
 
@@ -108,7 +124,7 @@ ung-dung-ke-toan/
 ```bash
 QT_QPA_PLATFORM=offscreen python -m pytest -q tests        # Windows PowerShell: $env:QT_QPA_PLATFORM="offscreen"
 ```
-Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md) (28 kiểm thử).
+Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md) (41 kiểm thử).
 Workflow `.github/workflows/ketoan-windows.yml` chạy kiểm thử trên Linux + Windows, đóng gói `.exe` và kiểm tra exe khởi động.
 
 ## 6. Phím tắt chính

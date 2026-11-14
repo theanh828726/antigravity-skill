@@ -32,7 +32,7 @@ Script tự: tạo `.venv` → cài thư viện → **chạy kiểm thử (dừn
 Kết quả: `dist\UngDungKeToan\UngDungKeToan.exe`.
 
 Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
-`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.1.0-gd2.exe`.
+`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.2.0-gd3.exe`.
 
 ## Dữ liệu, sao lưu, bảo mật
 | Mục | Vị trí / cách làm |
@@ -56,9 +56,17 @@ Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
 7. Hằng tháng: nhập chứng từ (hoặc *Đọc hóa đơn XML*) → Kiểm tra (F6) → Ghi sổ (F9) → *Xuất kho hàng loạt* cho bảng kê bán →
    **Tính giá xuất kho** → *Đối chiếu doanh thu – giá vốn* → Trung tâm cảnh báo → Kết chuyển → Khóa kỳ.
 
-## Nâng cấp từ bản Giai đoạn 1
+## Báo cáo tài chính và thuế – cách dùng đúng
+1. *Hệ thống → Cài đặt → Chế độ kế toán*: chọn chế độ áp dụng + ngày hiệu lực **sau khi đã đối chiếu văn bản chính thức**.
+2. *Báo cáo tài chính → (báo cáo) → Quản lý mẫu…*: nhập mẫu từ file Excel (cột A mã, B tên chỉ tiêu, C công thức, D thụt lề, E in đậm) lấy
+   từ văn bản đã kiểm chứng; sửa lỗi nếu ứng dụng báo (cú pháp, tham chiếu, vòng lặp); quản trị viên bấm *Xác nhận đã kiểm chứng* kèm căn cứ.
+   Mẫu thử nghiệm đi kèm (DEMO_BS, DEMO_IS) **không dùng để nộp**.
+3. *Báo cáo thuế*: tham số thuế (thuế suất TNDN, điều chỉnh) do người dùng nhập kèm căn cứ; báo cáo chỉ hỗ trợ tính toán.
+4. Cuối năm: kết chuyển hết doanh thu/chi phí → khóa kỳ → *Hệ thống → Chuyển số dư cuối năm*.
+
+## Nâng cấp từ bản Giai đoạn 1 và 2
 Mở file dữ liệu cũ bằng bản mới: ứng dụng **tự nâng cấp lược đồ** (thêm hạn thanh toán, liên kết chứng từ, tồn kho đầu
-kỳ, phương pháp tính giá) trong một giao dịch; hạn thanh toán của chứng từ mua/bán cũ được tính = ngày hóa đơn + hạn TT
+kỳ, phương pháp tính giá, TSCĐ/CCDC, giá thành, mẫu báo cáo, tham số thuế) trong một giao dịch; hạn thanh toán của chứng từ mua/bán cũ được tính = ngày hóa đơn + hạn TT
 của đối tượng. Nên **sao lưu trước khi nâng cấp**. Bản cũ không mở được dữ liệu đã nâng cấp.
 
 ## Hóa đơn XML mẫu

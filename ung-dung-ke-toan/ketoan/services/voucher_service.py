@@ -464,6 +464,8 @@ class VoucherService:
         if self.periods.is_locked(v["posting_date"]):
             raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể xóa.")
         with self.db.transaction():
+            self.db.execute("DELETE FROM period_run WHERE voucher_id=?", (voucher_id,))
+            self.db.execute("UPDATE cost_sheet SET voucher_id=NULL WHERE voucher_id=?", (voucher_id,))
             self.db.execute("DELETE FROM voucher WHERE id=?", (voucher_id,))
             self.s.audit("Xóa chứng từ", "voucher", f"{v['vtype']}/{v['number']}",
                          {"tong_thanh_toan": v["total_payment"], "ngay": v["posting_date"]})

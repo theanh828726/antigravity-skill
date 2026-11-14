@@ -51,8 +51,8 @@ def test_migration_upgrades_v1_database(tmp_path):
     db.execute("INSERT INTO partner(company_id, code, name, payment_terms) VALUES(1,'P','P',15)")
     db.execute("""INSERT INTO voucher(company_id, vtype, number, voucher_date, posting_date, partner_id, invoice_date)
                   VALUES(1,'BKBH','BH1','2026-03-01','2026-03-01',1,'2026-03-02')""")
-    assert db.migrate() == [2]
-    assert db.schema_version() == 2
+    assert db.migrate()[0] == 2
+    assert db.schema_version() >= 2
     assert db.scalar("SELECT due_date FROM voucher") == "2026-03-17"
     assert db.scalar("SELECT costing_method FROM company") == "BQCK"
     assert db.migrate() == []                      # chạy lại không làm gì

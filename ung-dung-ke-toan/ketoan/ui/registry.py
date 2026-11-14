@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-IMPLEMENTED_PHASE = 2
+IMPLEMENTED_PHASE = 3
 
 
 @dataclass(frozen=True)
@@ -91,8 +91,9 @@ FUNCS: dict[str, Func] = dict([
        plan="Mẫu báo cáo theo chế độ kế toán áp dụng, truy ngược chỉ tiêu → sổ chi tiết → chứng từ."),
     _f("bc_lctt", "Báo cáo lưu chuyển tiền tệ", "cashflow", "bao_cao", 3,
        plan="Phương pháp trực tiếp/gián tiếp theo mẫu của chế độ áp dụng."),
-    _f("bc_tm", "Thuyết minh báo cáo tài chính", "notes", "bao_cao", 3,
-       plan="Thuyết minh theo mẫu, lấy số liệu tự động từ sổ sách."),
+    _f("bc_tm", "Thuyết minh báo cáo tài chính", "notes", "bao_cao", 4,
+       plan="Thuyết minh dạng văn bản và bảng biểu theo mẫu của chế độ kế toán áp dụng, lấy số liệu từ sổ sách. Cần mẫu đã kiểm chứng "
+            "từ văn bản chính thức (chưa lấy được toàn văn mẫu trong phiên làm việc) – dự kiến bổ sung sau khi có mẫu."),
     # ---------------- Thuế
     _f("t_gtgt", "Thuế GTGT", "tax", "thue", 3,
        plan="Bảng kê hóa đơn mua vào/bán ra từ chứng từ, tổng hợp số liệu hỗ trợ lập tờ khai. Đây là báo cáo HỖ TRỢ "
@@ -114,6 +115,7 @@ FUNCS: dict[str, Func] = dict([
     _f("s_backup", "Sao lưu – khôi phục", "backup", "he_thong"),
     _f("s_company", "Doanh nghiệp & chế độ kế toán", "settings", "he_thong"),
     _f("s_closing", "Kết chuyển cuối kỳ", "scale", "tong_hop"),
+    _f("s_yearend", "Chuyển số dư cuối năm", "refresh", "he_thong", 3),
     _f("dashboard", "Tổng quan", "home", "he_thong"),
 ])
 
@@ -143,6 +145,6 @@ MENU = [
     ("Giá thành", "factory", [("GIÁ THÀNH", ["gt_ct", "gt_sct", "gt_dm", "gt_kdm", "gt_gd", "gt_dv", "gt_vt", "gt_kdd"])]),
     ("Ngân hàng – Quỹ", "bank", [("NGÂN HÀNG – QUỸ", ["v_PT", "v_PC", "v_NH", "r_soquy", "r_sotgnh"])]),
     ("In hồ sơ", "printer", [("IN HỒ SƠ", ["m_inhs"])]),
-    ("Hệ thống", "settings", [("HỆ THỐNG", ["s_company", "s_users", "s_lock", "s_closing", "s_alerts", "s_audit",
+    ("Hệ thống", "settings", [("HỆ THỐNG", ["s_company", "s_users", "s_lock", "s_closing", "s_yearend", "s_alerts", "s_audit",
                                             "s_backup"])]),
 ]
