@@ -9,7 +9,7 @@ import random
 from calendar import monthrange
 from pathlib import Path
 
-from ketoan.data.db import Database
+from ketoan.data.db import Database, PostgresDatabase, is_pg_url
 from ketoan.domain.money import to_decimal
 from ketoan.services.auth_service import create_user, ensure_default_roles
 from ketoan.services.context import CurrentUser, Session
@@ -115,11 +115,22 @@ DEMO_USERS = [("admin", "Quản trị hệ thống", "ADMIN", "admin@123"),
               ("xem", "Người xem báo cáo", "XEM", "xem@123")]
 
 
-def create_database(path: str | Path, demo: bool = True, company_name: str = "", tax_code: str = "") -> Database:
-    path = Path(path)
-    if path.exists():
-        path.unlink()
-    db = Database(path)
+def create_database(path: str | Path, demo: bool = True, company_name: str = "", tax_code: str = "", reset: bool = False):
+    """Tạo CSDL mới tại file SQLite hoặc URL PostgreSQL. SQLite: ghi đè file cũ. PostgreSQL: chỉ tạo khi CSDL trống
+    (reset=True mới xóa toàn bộ dữ liệu hiện có – dùng cho kiểm thử)."""
+    if is_pg_url(str(path)):
+        db = PostgresDatabase(str(path))
+        if db.has_schema():
+            if not reset:
+                db.close()
+                raise RuntimeError("CSDL PostgreSQL này đã có dữ liệu – không ghi đè. Hãy dùng CSDL trống hoặc mở dữ liệu hiện có.")
+            db.execute("DROP SCHEMA public CASCADE")
+            db.execute("CREATE SCHEMA public")
+    else:
+        path = Path(path)
+        if path.exists():
+            path.unlink()
+        db = Database(path)
     db.init_schema()
     with db.transaction():
         for code, name, ref, f, t, note in REGIMES:

@@ -10,7 +10,7 @@ a = Analysis(
     [str(ROOT / "main.py")],
     pathex=[str(ROOT)],
     datas=[(str(ROOT / "ketoan" / "data" / "schema.sql"), "ketoan/data")],
-    hiddenimports=["openpyxl", "PySide6.QtPrintSupport"],
+    hiddenimports=["openpyxl", "PySide6.QtPrintSupport", "psycopg", "psycopg_binary"],
     excludes=["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "PySide6.Qt3DCore",
               "PySide6.QtQuick", "PySide6.QtQml", "PySide6.QtMultimedia", "PySide6.QtCharts", "PySide6.QtDataVisualization",
               "PySide6.QtPdf", "PySide6.QtBluetooth", "PySide6.QtPositioning", "tkinter", "pytest",

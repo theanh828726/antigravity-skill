@@ -35,7 +35,7 @@ class TaxService:
                    SUM(l.amount) AS amount, SUM(l.tax_amount) AS tax
             FROM voucher v JOIN voucher_line l ON l.voucher_id=v.id LEFT JOIN partner p ON p.id=v.partner_id
             WHERE v.company_id=? AND v.vtype=? AND v.status='POSTED' AND v.posting_date BETWEEN ? AND ?
-            GROUP BY v.id, l.tax_rate ORDER BY v.posting_date, v.number""", (self.s.company_id, direction, d_from, d_to))
+            GROUP BY v.id, l.tax_rate, p.name, p.code ORDER BY v.posting_date, v.number""", (self.s.company_id, direction, d_from, d_to))
         return [dict(r) for r in rows]
 
     @staticmethod

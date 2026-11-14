@@ -27,7 +27,7 @@ class ClosingService:
         rows = self.db.query("""SELECT e.account_code acc, a.name, SUM(e.debit) d, SUM(e.credit) cr
                                 FROM ledger_entry e LEFT JOIN account a ON a.company_id=e.company_id AND a.code=e.account_code
                                 WHERE e.company_id=? AND e.posting_date BETWEEN ? AND ?
-                                GROUP BY e.account_code ORDER BY e.account_code""", (c, d_from, d_to))
+                                GROUP BY e.account_code, a.name ORDER BY e.account_code""", (c, d_from, d_to))
         lines, result = [], 0
         for r in rows:
             net = r["d"] - r["cr"]

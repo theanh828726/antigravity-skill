@@ -3,7 +3,7 @@
 ;   "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss
 
 #define AppName "Ung dung Ke toan - Hocviendaotaoai"
-#define AppVersion "1.2.0-gd3"
+#define AppVersion "1.3.0-gd4"
 
 [Setup]
 AppId={{6E7B9A52-3C1D-4E8F-9A0B-2F6C8D4E1A37}

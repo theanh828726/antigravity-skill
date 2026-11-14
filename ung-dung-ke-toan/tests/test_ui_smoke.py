@@ -12,10 +12,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QDialog, QMessageBox  # noqa: E402
 
-from ketoan.data.db import Database  # noqa: E402
-from ketoan.data.seed import create_database  # noqa: E402
-from ketoan.services.auth_service import authenticate  # noqa: E402
-from ketoan.services.context import Session  # noqa: E402
 
 SHOTS = os.environ.get("KETOAN_SHOTS")
 
@@ -31,11 +27,8 @@ def app():
 
 
 @pytest.fixture()
-def window(app, tmp_path, monkeypatch):
-    p = tmp_path / "ui.db"
-    create_database(p).close()
-    db = Database(p)
-    s = Session(db, authenticate(db, "admin", "admin@123"))
+def window(app, factory, tmp_path, monkeypatch):
+    s = factory()                       # SQLite và (khi có KETOAN_PG_TEST_URL) cả PostgreSQL
     # các hộp thoại xác nhận/thông báo tự động đồng ý trong kiểm thử
     monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.Yes)
     monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **k: QMessageBox.Ok))
@@ -51,7 +44,6 @@ def window(app, tmp_path, monkeypatch):
     w._warnings = warnings
     yield w
     w.close()
-    db.close()
 
 
 def shot(w, name):

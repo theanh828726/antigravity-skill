@@ -2,17 +2,15 @@
 đối chiếu doanh thu – giá vốn, đọc hóa đơn XML."""
 from __future__ import annotations
 
-import shutil
 
 import pytest
 
 from ketoan.data.db import SCHEMA_FILE, Database
-from ketoan.data.seed import create_database, write_sample_invoices
+from ketoan.data.seed import write_sample_invoices
 from ketoan.domain.constants import POSTED
 from ketoan.domain.money import to_decimal
 from ketoan.services.alert_service import AlertService
-from ketoan.services.auth_service import authenticate
-from ketoan.services.context import BusinessError, Session
+from ketoan.services.context import BusinessError
 from ketoan.services.debt_service import DebtService
 from ketoan.services.inventory_service import InventoryService
 from ketoan.services.ledger_service import LedgerService
@@ -21,20 +19,9 @@ from ketoan.services.voucher_service import VoucherService
 from ketoan.services.xml_invoice import XmlInvoiceService, parse_file
 
 
-@pytest.fixture(scope="module")
-def demo_path(tmp_path_factory):
-    p = tmp_path_factory.mktemp("db2") / "demo.db"
-    create_database(p).close()
-    return p
-
-
 @pytest.fixture()
-def s(demo_path, tmp_path):
-    p = tmp_path / "work.db"
-    shutil.copy(demo_path, p)
-    db = Database(p)
-    yield Session(db, authenticate(db, "admin", "admin@123"), company_id=1)
-    db.close()
+def s(factory):
+    return factory()
 
 
 def _tb_balanced(s, a="2026-01-01", b="2026-12-31"):

@@ -1,10 +1,10 @@
-# Kết quả kiểm tra – Giai đoạn 1, 2, 3 (v1.2.0)
+# Kết quả kiểm tra – Giai đoạn 1, 2, 3, 4 (v1.3.0)
 
 Ngày kiểm tra: 14/11/2026 · Python 3.13 · PySide6 6.12 · SQLite · giao diện chạy offscreen ở **1366 × 768**.
 
 ```
 $ QT_QPA_PLATFORM=offscreen python -m pytest -v tests
-41 passed   (11 nghiệp vụ GĐ1 · 10 nghiệp vụ GĐ2 · 12 nghiệp vụ GĐ3 · 8 giao diện)
+88 passed   (49 bài trên SQLite + 39 lượt trên PostgreSQL 16, gồm 6 bài đa người dùng)
 ```
 
 ## 1. Dữ liệu minh họa (`sample_data/ketoan_demo.db`)
@@ -100,7 +100,27 @@ một bài kiểm tra tích hợp với ~200 chứng từ.
   trên từng dòng chứng từ.
 - Kết luận: mọi nội dung pháp lý trong ứng dụng ở trạng thái **chưa kiểm chứng** và được đánh dấu như vậy; người dùng/kế toán trưởng cần đối chiếu văn bản gốc trước khi dùng thật.
 
-## 6. Đóng gói
+## 6. Giai đoạn 4 – nhiều người dùng (PostgreSQL), chi phí sản xuất, thuyết minh
+
+Toàn bộ bài kiểm thử nghiệp vụ GĐ1–GĐ3 và giao diện **chạy lại nguyên vẹn trên PostgreSQL 16** (mỗi bài một bản sao CSDL mẫu) – số liệu, sổ sách,
+báo cáo, khóa kỳ, phân quyền, nhập Excel/XML, sao lưu/khôi phục đều cho kết quả giống SQLite. Khi chuyển backend đã xử lý: số nguyên 64 bit cho tiền đồng, `SUM` trả về
+số nguyên, `LIKE` không phân biệt hoa thường, `GROUP BY` chặt chẽ, `RETURNING id`, migration theo từng hệ CSDL.
+
+| Nội dung | Kiểm thử | Kết quả |
+|---|---|---|
+| 3 người dùng (3 kết nối, 3 luồng) cùng nhập 24 chứng từ → **không trùng số**, không lỗi | `test_concurrent_numbering_has_no_duplicates` | ✅ |
+| 2 người cùng ghi sổ một chứng từ → **đúng một người thành công**, bút toán chỉ sinh một lần | `test_two_users_post_same_voucher_only_one_wins` | ✅ |
+| Người B sửa trên bản cũ sau khi A đã sửa → bị chặn kèm thông báo «đã được admin sửa… tải lại», nội dung của A không bị ghi đè | `test_stale_edit_is_rejected_with_clear_message` | ✅ |
+| Người này khóa kỳ → người kia không lưu được ngay lập tức; mở khóa thì lưu được | `test_period_lock_visible_across_connections` | ✅ |
+| Hai người cùng chạy khấu hao tháng 7 → chỉ một lần chạy được ghi nhận | `test_concurrent_depreciation_run_is_serialized` | ✅ |
+| Sao lưu PostgreSQL (`pg_dump`) → thêm dữ liệu → khôi phục (`pg_restore`) về đúng trạng thái, có nhật ký | `test_pg_backup_and_restore_roundtrip` | ✅ |
+| Kết chuyển CP 621/622/627 vào 154: chặn khi thiếu TK; phân bổ chi phí chung 10.000.000 → 6.666.667 + 3.333.333 theo CP trực tiếp (hoặc 100% theo nhân công); phần đã gắn đối tượng giữ nguyên; tổng 164.000.000; không chạy trùng; giá thành nhận đủ; hoàn tác | `test_overhead_transfer_to_154` | ✅ |
+| Mẫu thuyết minh (loại TM): dòng chữ không số liệu + dòng lấy số liệu từ sổ | `test_notes_template_kind` | ✅ |
+| Gói PyInstaller: `--init --demo` khởi tạo CSDL PostgreSQL (211 chứng từ) rồi exe đóng gói kết nối và chạy | thủ công + workflow | ✅ |
+
+CI (`ketoan-windows.yml`) chạy bộ kiểm thử với dịch vụ PostgreSQL 16 trên Linux và bộ kiểm thử SQLite + đóng gói trên Windows.
+
+## 6b. Đóng gói
 - PyInstaller (`packaging/ketoan.spec`) build thành công; bản đóng gói khởi động, tự tạo CSDL từ `schema.sql` đi kèm, đăng nhập
   và mở cửa sổ chính (kiểm tra trên Linux; trên Windows do workflow `ketoan-windows.yml` thực hiện, gồm bước khởi động exe).
 
@@ -133,8 +153,8 @@ một bài kiểm tra tích hợp với ~200 chứng từ.
 - Phân bổ thanh toán cho tuổi nợ là FIFO tự động (chưa có chức năng chỉ định thanh toán cho hóa đơn cụ thể / bù trừ công nợ).
 - Đọc hóa đơn XML: chỉ cấu trúc HDon/DLHDon, tiền VND; không kiểm tra chữ ký số, không tra cứu trạng thái hóa đơn với cơ quan
   thuế – cấu trúc cần kiểm chứng với file thực tế của nhà cung cấp hóa đơn.
-- Chưa có bản nhiều người dùng (PostgreSQL).
-- **Báo cáo tài chính**: không có mẫu chính thức đi kèm (xem mục kiểm chứng); Thuyết minh BCTC chưa triển khai (GĐ4).
+- Nhiều người dùng: chưa có chuyển dữ liệu tự động từ SQLite sang PostgreSQL; sao lưu/khôi phục cần pg_dump/pg_restore; chưa kiểm thử với tải lớn (hàng chục người dùng đồng thời) và chưa có danh sách người đang trực tuyến.
+- **Báo cáo tài chính / thuyết minh**: không có mẫu chính thức đi kèm (xem mục kiểm chứng); người dùng nhập mẫu đã kiểm chứng.
 - Khấu hao chỉ đường thẳng; thời gian sử dụng/ngưỡng ghi nhận do người dùng nhập; chưa có nâng cấp/đánh giá lại TSCĐ, khấu hao nhanh.
 - Giá thành: chưa có phân bổ chi phí sản xuất chung tự động (TK 621/622/627 không có trong hệ thống TK mẫu), quy đổi dở dang theo mức độ hoàn thành, giá thành phân bước.
 - Thuế: chưa có tờ khai điện tử theo cấu trúc cơ quan thuế; TNDN thuế suất/điều chỉnh nhập tay; TNCN chưa tính theo biểu thuế.

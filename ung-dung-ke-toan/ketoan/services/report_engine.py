@@ -11,7 +11,8 @@ CÔNG THỨC (ví dụ):   DN(111,112)+DN(131)-[130]
     DNDK(..) dư Nợ đầu năm      CNDK(..) dư Có đầu năm        (cột «Đầu năm» của báo cáo dạng BS)
     PSN(..) phát sinh Nợ        PSC(..) phát sinh Có          (trong kỳ)
     PSNDU(TK;TKĐƯ) / PSCDU(TK;TKĐƯ)  phát sinh Nợ / Có của TK đối ứng với TKĐƯ, ví dụ PSNDU(511;911)
-Loại mẫu: BS (tình hình tài chính / cân đối – có cột Đầu năm), IS (kết quả kinh doanh), CF (lưu chuyển tiền tệ).
+Loại mẫu: BS (tình hình tài chính / cân đối – có cột Đầu năm), IS (kết quả kinh doanh), CF (lưu chuyển tiền tệ),
+TM (thuyết minh: các dòng chữ không có công thức là nội dung diễn giải, dòng có công thức là số liệu lấy từ sổ).
 """
 from __future__ import annotations
 
@@ -23,7 +24,7 @@ from ketoan.services.ledger_service import LedgerService
 
 FUNCS = {"DN", "CN", "DNDK", "CNDK", "PSN", "PSC", "PSNDU", "PSCDU"}
 KINDS = {"BS": "Báo cáo tình hình tài chính / Bảng cân đối kế toán", "IS": "Báo cáo kết quả hoạt động kinh doanh",
-         "CF": "Báo cáo lưu chuyển tiền tệ"}
+         "CF": "Báo cáo lưu chuyển tiền tệ", "TM": "Thuyết minh báo cáo tài chính"}
 _TOKEN = re.compile(r"\s*(?:(\d+(?:\.\d+)?)|(\[[^\]\s]+\])|([A-Z]+)\(([^)]*)\)|(.))")
 
 

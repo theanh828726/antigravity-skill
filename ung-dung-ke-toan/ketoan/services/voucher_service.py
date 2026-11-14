@@ -183,7 +183,9 @@ class VoucherService:
                 "difference": debit - credit}
 
     # ================================================================ lưu
-    def save(self, header: dict, lines: list[dict], voucher_id: int | None = None) -> int:
+    def save(self, header: dict, lines: list[dict], voucher_id: int | None = None, expected_version: int | None = None) -> int:
+        """Lưu chứng từ (nháp). Nhiều người dùng: khóa dòng khi sửa, đánh số tuần tự bằng khóa tư vấn, và nếu truyền
+        ``expected_version`` (số phiên bản lúc người dùng mở chứng từ) thì từ chối khi chứng từ đã bị người khác sửa."""
         vtype = header["vtype"]
         if vtype not in VOUCHER_TYPES:
             raise BusinessError("Loại chứng từ không hợp lệ.")
@@ -195,19 +197,6 @@ class VoucherService:
                 raise BusinessError("Ngày chứng từ / ngày hạch toán không hợp lệ.") from None
         if self.periods.is_locked(header["posting_date"]):
             raise BusinessError(f"Ngày hạch toán {header['posting_date']} thuộc kỳ đã khóa – không thể lưu.")
-        if voucher_id:
-            old = self.db.one("SELECT * FROM voucher WHERE id=? AND company_id=?", (voucher_id, self.s.company_id))
-            if not old:
-                raise BusinessError("Chứng từ không còn tồn tại.")
-            if old["status"] == POSTED:
-                raise BusinessError("Chứng từ đã ghi sổ. Hãy «Bỏ ghi sổ» trước khi sửa.")
-            if self.periods.is_locked(old["posting_date"]):
-                raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể sửa.")
-        number = (header.get("number") or "").strip() or self.next_number(vtype)
-        dup = self.db.scalar("SELECT id FROM voucher WHERE company_id=? AND vtype=? AND number=? AND id<>?",
-                             (self.s.company_id, vtype, number, voucher_id or 0))
-        if dup:
-            raise BusinessError(f"Số chứng từ {number} đã tồn tại.")
         norm = self.normalize_lines(vtype, lines)
         if not norm:
             raise BusinessError("Chứng từ chưa có dòng hạch toán.")
@@ -215,14 +204,35 @@ class VoucherService:
         partner_id = self._resolve("partner", header.get("partner_code") or header.get("partner_id"))
         now, user = datetime.now().isoformat(timespec="seconds"), self.s.user.username
         h = {k: (header.get(k) or None) for k in HEADER_FIELDS}
-        h.update(number=number, partner_id=partner_id, vtype=vtype)
+        h.update(partner_id=partner_id, vtype=vtype)
         if vtype in DEBT_VTYPES and not h["due_date"] and partner_id:
             h["due_date"] = self.default_due_date(partner_id, h["invoice_date"] or h["voucher_date"])
         with self.db.transaction():
             if voucher_id:
+                self.db.lock_row("voucher", voucher_id)
+                old = self.db.one("SELECT * FROM voucher WHERE id=? AND company_id=?", (voucher_id, self.s.company_id))
+                if not old:
+                    raise BusinessError("Chứng từ không còn tồn tại (có thể đã bị người khác xóa).")
+                if old["status"] == POSTED:
+                    raise BusinessError("Chứng từ đã ghi sổ. Hãy «Bỏ ghi sổ» trước khi sửa.")
+                if self.periods.is_locked(old["posting_date"]):
+                    raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể sửa.")
+                if expected_version is not None and old["version"] != expected_version:
+                    raise BusinessError(f"Chứng từ đã được {old['updated_by'] or 'người khác'} sửa lúc "
+                                        f"{(old['updated_at'] or '').replace('T', ' ')} sau khi bạn mở. Hãy tải lại chứng từ "
+                                        "rồi nhập lại thay đổi để không ghi đè nội dung của họ.")
+            number = (header.get("number") or "").strip()
+            if not number:
+                self.db.advisory_lock(f"voucher-number:{self.s.company_id}:{vtype}")     # tránh hai người cùng lấy một số
+                number = self.next_number(vtype)
+            if self.db.scalar("SELECT id FROM voucher WHERE company_id=? AND vtype=? AND number=? AND id<>?",
+                              (self.s.company_id, vtype, number, voucher_id or 0)):
+                raise BusinessError(f"Số chứng từ {number} đã tồn tại.")
+            h["number"] = number
+            if voucher_id:
                 self.db.execute(f"""UPDATE voucher SET {', '.join(k + '=?' for k in HEADER_FIELDS)}, status=?,
                     total_amount=?, total_tax=?, total_payment=?, updated_by=?, updated_at=?, checked_by=NULL,
-                    checked_at=NULL WHERE id=?""",
+                    checked_at=NULL, version=version+1 WHERE id=?""",
                                 [h[k] for k in HEADER_FIELDS] + [DRAFT, tot["amount"], tot["tax"], tot["payment"], user, now,
                                                                  voucher_id])
                 self.db.execute("DELETE FROM voucher_line WHERE voucher_id=?", (voucher_id,))
@@ -344,13 +354,14 @@ class VoucherService:
 
     def check(self, voucher_id: int) -> list[Issue]:
         self.s.require("edit", "kiểm tra chứng từ")
-        v = self.get(voucher_id)
-        if v["status"] == POSTED:
-            raise BusinessError("Chứng từ đã ghi sổ.")
-        issues = self.validate_data(v, v["lines"], voucher_id)
-        if any(i.severity == SEV_BLOCK for i in issues):
-            raise ValidationFailed(issues)
         with self.db.transaction():
+            self.db.lock_row("voucher", voucher_id)
+            v = self.get(voucher_id)
+            if v["status"] == POSTED:
+                raise BusinessError("Chứng từ đã ghi sổ.")
+            issues = self.validate_data(v, v["lines"], voucher_id)
+            if any(i.severity == SEV_BLOCK for i in issues):
+                raise ValidationFailed(issues)
             self.db.execute("UPDATE voucher SET status=?, checked_by=?, checked_at=? WHERE id=?",
                             (CHECKED, self.s.user.username, datetime.now().isoformat(timespec="seconds"), voucher_id))
             self.s.audit("Kiểm tra chứng từ", "voucher", f"{v['vtype']}/{v['number']}")
@@ -384,14 +395,15 @@ class VoucherService:
 
     def post(self, voucher_id: int, skip_check_status: bool = False) -> list[Issue]:
         self.s.require("post", "ghi sổ")
-        v = self.get(voucher_id)
-        if v["status"] == POSTED:
-            raise BusinessError("Chứng từ đã được ghi sổ.")
-        issues = self.validate_data(v, v["lines"], voucher_id)
-        if any(i.severity == SEV_BLOCK for i in issues):
-            raise ValidationFailed(issues)
         now = datetime.now().isoformat(timespec="seconds")
         with self.db.transaction():
+            self.db.lock_row("voucher", voucher_id)          # hai người ghi sổ cùng lúc: người sau thấy chứng từ đã ghi sổ
+            v = self.get(voucher_id)
+            if v["status"] == POSTED:
+                raise BusinessError("Chứng từ đã được ghi sổ (có thể do người dùng khác vừa ghi sổ).")
+            issues = self.validate_data(v, v["lines"], voucher_id)
+            if any(i.severity == SEV_BLOCK for i in issues):
+                raise ValidationFailed(issues)
             d = self._write_ledger(v)
             self.db.execute("""UPDATE voucher SET status=?, posted_by=?, posted_at=?,
                                checked_by=COALESCE(checked_by, ?), checked_at=COALESCE(checked_at, ?) WHERE id=?""",
@@ -446,24 +458,26 @@ class VoucherService:
 
     def unpost(self, voucher_id: int):
         self.s.require("post", "bỏ ghi sổ")
-        v = self.get(voucher_id)
-        if v["status"] != POSTED:
-            raise BusinessError("Chứng từ chưa ghi sổ.")
-        if self.periods.is_locked(v["posting_date"]):
-            raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể bỏ ghi sổ. Cần mở khóa kỳ trước.")
         with self.db.transaction():
+            self.db.lock_row("voucher", voucher_id)
+            v = self.get(voucher_id)
+            if v["status"] != POSTED:
+                raise BusinessError("Chứng từ chưa ghi sổ.")
+            if self.periods.is_locked(v["posting_date"]):
+                raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể bỏ ghi sổ. Cần mở khóa kỳ trước.")
             self.db.execute("DELETE FROM ledger_entry WHERE voucher_id=?", (voucher_id,))
             self.db.execute("UPDATE voucher SET status=?, posted_by=NULL, posted_at=NULL WHERE id=?", (CHECKED, voucher_id))
             self.s.audit("Bỏ ghi sổ", "voucher", f"{v['vtype']}/{v['number']}")
 
     def delete(self, voucher_id: int):
         self.s.require("delete", "xóa chứng từ")
-        v = self.get(voucher_id)
-        if v["status"] == POSTED:
-            raise BusinessError("Chứng từ đã ghi sổ – phải «Bỏ ghi sổ» trước khi xóa.")
-        if self.periods.is_locked(v["posting_date"]):
-            raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể xóa.")
         with self.db.transaction():
+            self.db.lock_row("voucher", voucher_id)
+            v = self.get(voucher_id)
+            if v["status"] == POSTED:
+                raise BusinessError("Chứng từ đã ghi sổ – phải «Bỏ ghi sổ» trước khi xóa.")
+            if self.periods.is_locked(v["posting_date"]):
+                raise BusinessError("Chứng từ thuộc kỳ đã khóa – không thể xóa.")
             self.db.execute("DELETE FROM period_run WHERE voucher_id=?", (voucher_id,))
             self.db.execute("UPDATE cost_sheet SET voucher_id=NULL WHERE voucher_id=?", (voucher_id,))
             self.db.execute("DELETE FROM voucher WHERE id=?", (voucher_id,))

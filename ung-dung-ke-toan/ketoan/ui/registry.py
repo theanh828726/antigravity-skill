@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
-IMPLEMENTED_PHASE = 3
+IMPLEMENTED_PHASE = 4
 
 
 @dataclass(frozen=True)
@@ -91,9 +91,7 @@ FUNCS: dict[str, Func] = dict([
        plan="Mẫu báo cáo theo chế độ kế toán áp dụng, truy ngược chỉ tiêu → sổ chi tiết → chứng từ."),
     _f("bc_lctt", "Báo cáo lưu chuyển tiền tệ", "cashflow", "bao_cao", 3,
        plan="Phương pháp trực tiếp/gián tiếp theo mẫu của chế độ áp dụng."),
-    _f("bc_tm", "Thuyết minh báo cáo tài chính", "notes", "bao_cao", 4,
-       plan="Thuyết minh dạng văn bản và bảng biểu theo mẫu của chế độ kế toán áp dụng, lấy số liệu từ sổ sách. Cần mẫu đã kiểm chứng "
-            "từ văn bản chính thức (chưa lấy được toàn văn mẫu trong phiên làm việc) – dự kiến bổ sung sau khi có mẫu."),
+    _f("bc_tm", "Thuyết minh báo cáo tài chính", "notes", "bao_cao", 4),
     # ---------------- Thuế
     _f("t_gtgt", "Thuế GTGT", "tax", "thue", 3,
        plan="Bảng kê hóa đơn mua vào/bán ra từ chứng từ, tổng hợp số liệu hỗ trợ lập tờ khai. Đây là báo cáo HỖ TRỢ "

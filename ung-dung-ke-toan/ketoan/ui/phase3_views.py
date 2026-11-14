@@ -337,6 +337,9 @@ class CostView(QWidget):
         b = tool_button("Tính từ sổ", "calc", "primary")
         b.clicked.connect(self.calc)
         top.addWidget(b)
+        bo = tool_button("Kết chuyển CP 621/622/627 vào 154…", "refresh", None, "Kết chuyển chi phí sản xuất (nếu hệ thống TK có TK 621, 622, 627)")
+        bo.clicked.connect(lambda: OverheadDialog(self.ctx, self).exec())
+        top.addWidget(bo)
         top.addStretch(1)
         self.adapter = _Adapter()
         head.addStretch(1)
@@ -538,6 +541,89 @@ class CostView(QWidget):
             if ok:
                 self.ctx.voucher_changed()
                 self.calc()
+
+
+class OverheadDialog(QDialog):
+    """Kết chuyển chi phí 621/622/627 vào 154: xem trước → tạo chứng từ nháp → hoàn tác."""
+
+    def __init__(self, ctx, parent=None):
+        super().__init__(parent)
+        from ketoan.services.overhead_service import CRITERIA, OverheadService
+        self.ctx, self.s = ctx, ctx.session
+        self.svc = OverheadService(self.s)
+        self.setWindowTitle("Kết chuyển chi phí sản xuất vào TK 154")
+        self.resize(960, 560)
+        lay = QVBoxLayout(self)
+        lay.addWidget(_hint("Dành cho hệ thống tài khoản có TK 621, 622, 627 (khai báo trong Danh mục nếu chưa có). Chi phí đã gắn công trình/đối tượng "
+                            "kết chuyển thẳng; chi phí chung chưa gắn đối tượng được phân bổ theo tiêu thức đã chọn. Mỗi tháng chạy một lần; chứng từ tạo ra là NHÁP."))
+        bar = QHBoxLayout()
+        self.sp_year = QSpinBox()
+        self.sp_year.setRange(2000, 2100)
+        self.sp_year.setValue(self.s.date_to.year)
+        self.cb_month = QComboBox()
+        self.cb_month.addItems(MONTHS)
+        self.cb_month.setCurrentIndex(self.s.date_to.month - 1)
+        self.ed_direct, self.ed_over = QLineEdit("621,622"), QLineEdit("627")
+        self.cb_crit = QComboBox()
+        for k, v in CRITERIA.items():
+            self.cb_crit.addItem(v, k)
+        for w in (QLabel("Năm"), self.sp_year, QLabel("Tháng"), self.cb_month, QLabel("TK trực tiếp"), self.ed_direct, QLabel("TK chung"), self.ed_over,
+                  QLabel("Tiêu thức"), self.cb_crit):
+            bar.addWidget(w)
+        b = tool_button("Xem trước", "search", "primary")
+        b.clicked.connect(self.refresh)
+        bar.addWidget(b)
+        lay.addLayout(bar)
+        self.table = ReportTable()
+        lay.addWidget(self.table, 2)
+        self.warn = ReportTable()
+        self.warn.setMaximumHeight(110)
+        lay.addWidget(self.warn)
+        bb = QHBoxLayout()
+        self.status = QLabel()
+        bb.addWidget(self.status, 1)
+        self.b_apply = tool_button("Tạo chứng từ kết chuyển (nháp)", "post", "post")
+        self.b_undo = tool_button("Hoàn tác tháng này", "unpost")
+        self.b_apply.clicked.connect(self.apply)
+        self.b_undo.clicked.connect(self.undo)
+        bb.addWidget(self.b_apply)
+        bb.addWidget(self.b_undo)
+        lay.addLayout(bb)
+        self.refresh()
+
+    def _args(self):
+        sp = lambda t: [x.strip() for x in t.split(",") if x.strip()]
+        return self.sp_year.value(), self.cb_month.currentIndex() + 1, sp(self.ed_direct.text()), sp(self.ed_over.text()), self.cb_crit.currentData()
+
+    def refresh(self):
+        ok, pv = run(self, self.svc.preview, *self._args())
+        if not ok:
+            self.table.fill(["Thông báo"], [["Không xem trước được – xem thông báo lỗi."]], stretch_col=0)
+            self.b_apply.setEnabled(False)
+            return
+        self.table.fill(["Đối tượng", "Tên", "TK chi phí", "Loại", "Số tiền kết chuyển vào 154"],
+                        [[l["project_code"], l["project_name"], l["account"], l["kind"], l["amount"]] for l in pv["lines"]] + [["", "TỔNG CỘNG", "", "", pv["total"]]],
+                        money_cols={4}, widths=[90, 300, 90, 230, 190], total_rows={len(pv["lines"])}, stretch_col=1)
+        self.warn.fill(["Cảnh báo"], [[w] for w in pv["warnings"]] or [["Không có cảnh báo."]], stretch_col=0)
+        done = bool(pv["run"])
+        self.status.setText("<b style='color:#1E7A34'>Tháng này đã kết chuyển.</b>" if done else f"{len(pv['lines'])} dòng, tổng {fmt_money(pv['total'], False)}")
+        self.b_apply.setEnabled(bool(pv["lines"]) and not done and self.s.user.can("add"))
+        self.b_undo.setEnabled(done and self.s.user.can("post"))
+
+    def apply(self):
+        ok, vid = run(self, self.svc.apply, *self._args())
+        if ok:
+            self.ctx.voucher_changed()
+            self.refresh()
+            self.ctx.open_voucher(vid)
+
+    def undo(self):
+        y, m = self.sp_year.value(), self.cb_month.currentIndex() + 1
+        if confirm(self, f"Hoàn tác kết chuyển chi phí tháng {m:02d}/{y}?"):
+            ok, _ = run(self, self.svc.undo, y, m)
+            if ok:
+                self.ctx.voucher_changed()
+                self.refresh()
 
 
 class ProjectLedgerView(QWidget):

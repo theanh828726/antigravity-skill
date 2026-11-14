@@ -1,8 +1,8 @@
 # Ứng dụng Kế toán – Hocviendaotaoai
 
 Phần mềm kế toán Windows (Python + PySide6) cho doanh nghiệp thương mại, dịch vụ, sản xuất, xây dựng, vận tải.
-**Bản hiện tại: Giai đoạn 3 (v1.2.0)** – Giai đoạn 1 và 2 + tài sản cố định, công cụ dụng cụ, giá thành, báo cáo tài chính theo mẫu
-quản lý phiên bản, báo cáo hỗ trợ thuế, in hồ sơ, chuyển số dư cuối năm. Chạy được, có dữ liệu minh họa liên kết đầy đủ.
+**Bản hiện tại: Giai đoạn 4 (v1.3.0)** – Giai đoạn 1–3 + **nhiều người dùng qua PostgreSQL**, kết chuyển chi phí 621/622/627 vào 154,
+thuyết minh báo cáo tài chính theo mẫu nhập vào. Chạy được trên SQLite (một người dùng) và PostgreSQL (nhiều người dùng); có dữ liệu minh họa liên kết đầy đủ.
 
 > **Lưu ý pháp lý quan trọng:** ứng dụng **không có mẫu báo cáo tài chính nào đã được kiểm chứng** theo văn bản chính thức (không lấy được
 > toàn văn phụ lục mẫu từ nguồn chính thức trong quá trình phát triển). Bộ máy báo cáo cho phép nhập mẫu đã kiểm chứng; mẫu đi kèm chỉ để thử
@@ -20,7 +20,8 @@ Dữ liệu chỉ nhập một lần; mọi dòng sổ mang khóa chứng từ �
 ```bash
 cd ung-dung-ke-toan
 python -m pip install -r requirements.txt
-python main.py                 # lần đầu tự tạo dữ liệu minh họa
+python main.py                 # lần đầu tự tạo dữ liệu minh họa (SQLite, một người dùng)
+python main.py --db postgresql://ketoan@máy-chủ:5432/ketoan          # nhiều người dùng (xem docs/HUONG_DAN_CAI_DAT.md)
 ```
 
 | Tài khoản | Mật khẩu | Vai trò |
@@ -59,7 +60,10 @@ Tùy chọn: `--db <file.db>` mở file chỉ định · `--reset-demo` tạo l�
 | Báo cáo tài chính | **Bộ máy mẫu có phiên bản**: nhập mẫu từ Excel (mã – chỉ tiêu – công thức theo TK: DN/CN/DNDK/CNDK/PSN/PSC/PSNDU/PSCDU), kiểm tra cú pháp – tham chiếu – vòng lặp, cột Đầu năm, truy ngược chỉ tiêu → sổ chi tiết → chứng từ, xác nhận kiểm chứng kèm căn cứ (quyền quản trị), cảnh báo trên mọi bản xem/in/xuất khi chưa kiểm chứng. Dùng cho BS / KQKD / LCTT | ✅ GĐ3 (mẫu chính thức: **người dùng nhập**) |
 | Hỗ trợ thuế | **GTGT**: bảng kê mua vào/bán ra theo thuế suất người dùng chọn trên dòng, tổng hợp, đối chiếu thuế trên hóa đơn với bút toán sổ; **Đối chiếu hóa đơn – sổ**: lệch thuế, thiếu thông tin, trùng hóa đơn, lệch kỳ; **TNDN tạm tính**: lợi nhuận kế toán từ sổ, điều chỉnh và thuế suất do người dùng nhập kèm căn cứ (chưa nhập thuế suất thì không tính); **TNCN**: tổng hợp thu nhập và thuế đã khấu trừ theo nhân viên (chưa tính biểu thuế) | ✅ GĐ3 (hỗ trợ tính toán) |
 | In hồ sơ, cuối năm | In hàng loạt PDF (CĐSPS, nhật ký chung, sổ cái, sổ quỹ, sổ TGNH, từng chứng từ) kèm mục lục, có nhật ký; **chuyển số dư cuối năm** (số dư theo đối tượng + tồn kho, 4212 → 4211, kiểm tra đã kết chuyển/tồn âm/kỳ khóa) | ✅ GĐ3 |
-| Chưa triển khai (GĐ4) | Thuyết minh báo cáo tài chính (cần mẫu đã kiểm chứng); tờ khai điện tử theo cấu trúc cơ quan thuế; biểu thuế TNCN; đa người dùng PostgreSQL; chi phí sản xuất chung tự động (TK 621/622/627) | ⏳ ô «Thuyết minh» nhãn **GĐ4** |
+| **Nhiều người dùng (GĐ4)** | Backend **PostgreSQL** cùng giao diện với SQLite (tự chuyển cú pháp); hộp thoại kết nối + khởi tạo (`--db postgresql://… --init`); khóa dòng khi ghi sổ/bỏ ghi sổ/xóa, đánh số chứng từ bằng khóa tư vấn (không trùng số khi nhiều người nhập cùng lúc), **chặn sửa chồng** (số phiên bản chứng từ), chạy khấu hao/phân bổ/kết chuyển tuần tự; sao lưu/khôi phục bằng pg_dump/pg_restore; **toàn bộ bộ test chạy trên cả hai CSDL** | ✅ GĐ4 |
+| Chi phí sản xuất → 154 (GĐ4) | Cho hệ thống TK có TK 621/622/627: kết chuyển chi phí đã gắn đối tượng, phân bổ chi phí chung chưa gắn theo tiêu thức (tổng CP trực tiếp hoặc nhân công trực tiếp), xem trước → chứng từ nháp → hoàn tác, chặn chạy trùng tháng | ✅ GĐ4 |
+| Thuyết minh BCTC (GĐ4) | Dùng bộ máy mẫu có phiên bản (loại TM: dòng chữ + dòng số liệu từ sổ); mẫu chính thức do người dùng nhập | ✅ GĐ4 (mẫu chính thức: **người dùng nhập**) |
+| Chưa triển khai | Tờ khai điện tử theo cấu trúc cơ quan thuế (cần đặc tả chính thức); biểu thuế TNCN và quyết toán; phân bổ chi phí theo giờ máy/định mức; chuyển dữ liệu tự động SQLite → PostgreSQL; sao lưu PostgreSQL không cần pg_dump | ⏳ |
 | Nâng cấp dữ liệu | Migration lược đồ theo phiên bản: file dữ liệu GĐ1 (và bản sao lưu cũ khi khôi phục) tự nâng cấp trong một giao dịch | ✅ GĐ2 |
 | GĐ3 | TSCĐ (khấu hao), CCDC (phân bổ), giá thành (8 loại), BCTC theo mẫu, hỗ trợ thuế GTGT/TNDN/TNCN, in hồ sơ | ⏳ ô hiển thị nhãn **GĐ3**, mở ra trang mô tả phạm vi – không giả lập |
 
@@ -73,8 +77,8 @@ ung-dung-ke-toan/
 │   │   ├── money.py              # Decimal, chính sách làm tròn, định dạng VN
 │   │   └── constants.py          # trạng thái, quyền, loại chứng từ & cột hiển thị
 │   ├── data/                     # truy cập dữ liệu
-│   │   ├── schema.sql            # lược đồ SQLite
-│   │   ├── db.py                 # kết nối, giao dịch nguyên tử lồng nhau, backup API
+│   │   ├── schema.sql            # lược đồ gốc (v1); các bản sau qua MIGRATIONS trong db.py
+│   │   ├── db.py                 # SQLite + PostgreSQL: giao dịch lồng nhau, khóa, migration, sao lưu
 │   │   └── seed.py               # tạo CSDL mới + dữ liệu minh họa (qua lớp nghiệp vụ)
 │   ├── services/                 # nghiệp vụ
 │   │   ├── context.py            # phiên: người dùng, doanh nghiệp, kỳ, kiểm quyền, nhật ký
@@ -93,11 +97,12 @@ ung-dung-ke-toan/
 │   │   ├── report_engine.py      # GĐ3: mẫu báo cáo có phiên bản + bộ tính công thức
 │   │   ├── tax_service.py        # GĐ3: báo cáo hỗ trợ thuế
 │   │   ├── yearend_service.py    # GĐ3: chuyển số dư cuối năm
+│   │   ├── overhead_service.py   # GĐ4: kết chuyển chi phí 621/622/627 vào 154
 │   │   ├── period_service.py     # năm tài chính, khóa kỳ
 │   │   └── system_service.py     # doanh nghiệp, chế độ KT, số dư đầu, sao lưu, nhật ký
 │   ├── reports/export.py         # Excel / PDF / in
 │   └── ui/                       # PySide6 – chỉ gọi services, không viết SQL
-├── tests/                        # 41 kiểm thử: nghiệp vụ GĐ1–GĐ3 + giao diện offscreen
+├── tests/                        # 88 lượt kiểm thử khi có PostgreSQL (49 trên SQLite + 39 trên PostgreSQL, gồm 6 bài đa người dùng chạy song song nhiều kết nối): nghiệp vụ GĐ1–GĐ4 + giao diện offscreen
 ├── sample_data/                  # ketoan_demo.db + hoa_don_xml/ (4 hóa đơn XML mẫu)
 ├── packaging/                    # PyInstaller spec, build_windows.bat, Inno Setup
 └── docs/                         # hướng dẫn cài đặt, kết quả kiểm tra, ảnh màn hình
@@ -123,8 +128,9 @@ ung-dung-ke-toan/
 
 ```bash
 QT_QPA_PLATFORM=offscreen python -m pytest -q tests        # Windows PowerShell: $env:QT_QPA_PLATFORM="offscreen"
+KETOAN_PG_TEST_URL=postgresql://postgres@localhost:5432/postgres python -m pytest -q tests   # thêm PostgreSQL + đa người dùng
 ```
-Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md) (41 kiểm thử).
+Kết quả và mô tả các luồng: [docs/KET_QUA_KIEM_TRA.md](docs/KET_QUA_KIEM_TRA.md) (kiểm thử chạy trên SQLite và PostgreSQL).
 Workflow `.github/workflows/ketoan-windows.yml` chạy kiểm thử trên Linux + Windows, đóng gói `.exe` và kiểm tra exe khởi động.
 
 ## 6. Phím tắt chính

@@ -13,6 +13,15 @@ permissions:
 jobs:
   test-linux:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     defaults:
       run:
         working-directory: ung-dung-ke-toan
@@ -24,9 +33,10 @@ jobs:
       - name: Thu vien he thong cho Qt offscreen
         run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
       - run: pip install -r requirements.txt pytest
-      - name: Kiem thu nghiep vu + giao dien
+      - name: Kiem thu nghiep vu + giao dien (SQLite va PostgreSQL, gom da nguoi dung)
         env:
           QT_QPA_PLATFORM: offscreen
+          KETOAN_PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: python -m pytest -q tests
 
   build-windows:

@@ -32,7 +32,7 @@ Script tự: tạo `.venv` → cài thư viện → **chạy kiểm thử (dừn
 Kết quả: `dist\UngDungKeToan\UngDungKeToan.exe`.
 
 Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
-`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.2.0-gd3.exe`.
+`"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss` → `dist\CaiDat_UngDungKeToan_1.3.0-gd4.exe`.
 
 ## Dữ liệu, sao lưu, bảo mật
 | Mục | Vị trí / cách làm |
@@ -43,8 +43,26 @@ Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
 | Mở / tạo dữ liệu khác | Thanh điều khiển → *Dữ liệu kế toán* → *Mở dữ liệu khác…* / *Tạo dữ liệu mới…* (quyền quản trị) |
 | Mật khẩu | Lưu dạng băm PBKDF2-SHA256; **đổi mật khẩu các tài khoản mặc định** ngay khi dùng thật (Hệ thống → Người dùng & phân quyền) |
 
-**Quan trọng:** bản này dùng SQLite cho **một người dùng trên một máy**. Không đặt file `.db` trong thư mục chia sẻ mạng (LAN)
-để nhiều người cùng mở – có nguy cơ hỏng dữ liệu. Nhu cầu nhiều người dùng sẽ triển khai trên PostgreSQL.
+**Quan trọng:** SQLite dành cho **một người dùng trên một máy**. Không đặt file `.db` trong thư mục chia sẻ mạng (LAN) để nhiều người cùng
+mở – có nguy cơ hỏng dữ liệu. Nhiều người dùng cùng làm việc: dùng **PostgreSQL** (mục dưới).
+
+## Triển khai nhiều người dùng với PostgreSQL (PostgreSQL 14 trở lên; đã kiểm thử trên 16)
+1. **Máy chủ:** cài PostgreSQL; tạo tài khoản và CSDL (khuyến nghị collation `C` để thứ tự sắp xếp giống bản SQLite):
+   ```sql
+   CREATE ROLE ketoan LOGIN PASSWORD '<mật khẩu mạnh>';
+   CREATE DATABASE ketoan OWNER ketoan TEMPLATE template0 ENCODING 'UTF8' LC_COLLATE 'C' LC_CTYPE 'C.UTF-8';
+   ```
+2. **Mạng và bảo mật:** chỉ mở cổng 5432 trong mạng nội bộ/VPN; cấu hình `pg_hba.conf` giới hạn địa chỉ + `scram-sha-256`; bật TLS và dùng
+   `?sslmode=require` khi đi qua mạng không tin cậy. Ứng dụng **không lưu mật khẩu CSDL** (dùng `~/.pgpass` hoặc biến `PGPASSWORD`, hoặc nhập khi kết nối).
+3. **Khởi tạo một lần** (từ một máy bất kỳ): `UngDungKeToan.exe --db postgresql://ketoan@máy-chủ:5432/ketoan --init --company "Tên doanh nghiệp"`
+   (thêm `--demo` nếu muốn dữ liệu minh họa). Hoặc dùng *Dữ liệu kế toán → Kết nối PostgreSQL…* và tích «Khởi tạo CSDL mới». Khởi tạo **không ghi đè** CSDL đã có dữ liệu.
+4. **Mỗi người dùng:** cài ứng dụng, chạy `UngDungKeToan.exe --db postgresql://ketoan@máy-chủ:5432/ketoan` (hoặc kết nối qua hộp thoại – lần sau ứng dụng nhớ máy chủ,
+   không nhớ mật khẩu), đăng nhập bằng tài khoản ứng dụng của riêng mình (phân quyền như bản một người dùng).
+5. **Cơ chế đồng thời:** ghi sổ/bỏ ghi sổ/xóa khóa dòng chứng từ (người sau thấy chứng từ đã được xử lý); số chứng từ cấp tuần tự không trùng; sửa chồng một chứng từ bị
+   chặn kèm thông báo người sửa trước; chạy khấu hao/phân bổ/kết chuyển tuần tự; khóa kỳ có hiệu lực ngay với mọi người dùng.
+6. **Sao lưu/khôi phục:** nút trong ứng dụng dùng `pg_dump`/`pg_restore` (cần PostgreSQL client tools trong PATH trên máy chạy ứng dụng; file `.dump`). Khôi phục
+   ghi đè CSDL – nên thực hiện khi không ai đang làm việc. Doanh nghiệp vẫn nên có sao lưu định kỳ ở phía máy chủ (pg_dump theo lịch, WAL archiving).
+7. **Chuyển từ SQLite sang PostgreSQL:** chưa có chức năng chuyển dữ liệu tự động; với dữ liệu thật hãy khởi tạo CSDL mới rồi nhập danh mục (Excel), số dư đầu kỳ và chứng từ.
 
 ## Bắt đầu với doanh nghiệp thật
 1. *Dữ liệu kế toán → Tạo dữ liệu mới…*, nhập tên doanh nghiệp, đăng nhập `admin / admin@123`, **đổi mật khẩu**.

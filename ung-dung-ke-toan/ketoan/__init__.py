@@ -10,4 +10,4 @@ Kiến trúc phân lớp:
 
 APP_NAME = "Ứng dụng Kế toán"
 APP_BRAND = "Hocviendaotaoai"
-APP_VERSION = "1.2.0-gd3"
+APP_VERSION = "1.3.0-gd4"

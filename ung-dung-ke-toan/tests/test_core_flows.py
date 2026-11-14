@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from ketoan.data.seed import create_database
 from ketoan.domain.constants import CHECKED, DRAFT, POSTED, SEV_BLOCK
 from ketoan.domain.money import fmt_money, line_amount, round_money, tax_amount, to_decimal
 from ketoan.services.auth_service import authenticate
@@ -18,24 +17,9 @@ from ketoan.services.system_service import BackupService, OpeningBalanceService
 from ketoan.services.voucher_service import ValidationFailed, VoucherService
 
 
-@pytest.fixture(scope="module")
-def demo_path(tmp_path_factory):
-    p = tmp_path_factory.mktemp("db") / "demo.db"
-    create_database(p).close()
-    return p
-
-
 @pytest.fixture()
-def session(demo_path, tmp_path):
-    import shutil
-    p = tmp_path / "work.db"
-    shutil.copy(demo_path, p)
-    from ketoan.data.db import Database
-    db = Database(p)
-    user = authenticate(db, "admin", "admin@123")
-    s = Session(db, user, company_id=1)
-    yield s
-    db.close()
+def session(factory):
+    return factory()
 
 
 def as_user(s: Session, username, pwd):

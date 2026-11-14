@@ -224,7 +224,7 @@ class Dashboard(QWidget):
         two.addWidget(TileGroup(g[2][0], g[2][1], self.ctx.open), 5)
         two.addWidget(TileGroup(g[3][0], g[3][1], self.ctx.open), 4)
         lay.addLayout(two)
-        legend = QLabel("Ô màu nhạt có nhãn <b>GĐ4</b>: chức năng chưa triển khai, bấm để xem phạm vi dự kiến. "
+        legend = QLabel("Chức năng chưa triển khai (nếu có) hiển thị màu nhạt kèm nhãn giai đoạn. "
                         "Phím tắt: F5 cập nhật · Ctrl+W đóng tab · Ctrl+Tab chuyển tab · F1 trợ giúp.")
         legend.setObjectName("Hint")
         lay.addWidget(legend)

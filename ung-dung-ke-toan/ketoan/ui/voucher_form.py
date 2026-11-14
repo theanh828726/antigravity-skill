@@ -771,7 +771,7 @@ class VoucherForm(QWidget):
         if not self.editing:
             return True
         header, lines = self.collect()
-        ok, vid = run(self, self.vs.save, header, lines, self.voucher_id)
+        ok, vid = run(self, self.vs.save, header, lines, self.voucher_id, self.data.get("version") if self.voucher_id else None)
         if not ok:
             return False
         self.load(vid)

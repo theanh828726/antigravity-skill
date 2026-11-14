@@ -38,7 +38,7 @@ def ensure_default_roles(db: Database):
         ("XEM", "Chỉ xem", "view"),
     ]
     for code, name, perms in roles:
-        db.execute("INSERT OR IGNORE INTO role(code, name, permissions) VALUES(?,?,?)", (code, name, perms))
+        db.execute("INSERT INTO role(code, name, permissions) VALUES(?,?,?) ON CONFLICT DO NOTHING", (code, name, perms))
 
 
 def create_user(db: Database, username: str, full_name: str, role_code: str, password: str):

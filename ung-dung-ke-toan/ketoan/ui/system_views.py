@@ -348,7 +348,7 @@ class BackupView(QWidget):
         t = QLabel("SAO LƯU – KHÔI PHỤC DỮ LIỆU")
         t.setObjectName("PageTitle")
         root.addWidget(t)
-        info_lab = QLabel(f"Dữ liệu đang mở: <b>{self.s.db.path}</b><br/>Thư mục sao lưu: <b>{ctx.backup_dir}</b><br/>"
+        info_lab = QLabel(f"Dữ liệu đang mở: <b>{self.s.db.path}</b> ({self.s.db.dialect})<br/>Thư mục sao lưu: <b>{ctx.backup_dir}</b><br/>"
                           "Khôi phục sẽ tự động sao lưu dữ liệu hiện tại trước khi ghi đè (file «truoc_khoi_phuc_…»).")
         info_lab.setWordWrap(True)
         root.addWidget(info_lab)
@@ -647,8 +647,12 @@ chuyển cuối kỳ (xem trước + hoàn tác), khóa kỳ, phân quyền, nh�
 (giản đơn, không dở dang, theo định mức, không định mức, công trình, dịch vụ, vận tải; sổ chi tiết công trình), báo cáo tài
 chính theo <b>mẫu quản lý phiên bản</b> (nhập mẫu từ Excel, công thức theo TK, truy ngược sổ), báo cáo hỗ trợ thuế GTGT, TNDN,
 TNCN và đối chiếu hóa đơn – sổ, in hồ sơ PDF hàng loạt, chuyển số dư cuối năm.</p>
-<p><b>Báo cáo tài chính:</b> ứng dụng chưa có mẫu đã kiểm chứng theo văn bản chính thức; mẫu đi kèm chỉ là mẫu thử nghiệm kỹ thuật và
-luôn mang cảnh báo «CHƯA KIỂM CHỨNG». Các ô nhãn <b>GĐ4</b> (Thuyết minh báo cáo tài chính) chưa triển khai.</p>
+<h3>Giai đoạn 4 (đã triển khai)</h3>
+<p><b>Nhiều người dùng:</b> kết nối PostgreSQL (Thanh điều khiển → Dữ liệu kế toán → «Kết nối PostgreSQL…»); khóa dòng khi ghi sổ, đánh số
+chứng từ tuần tự, chặn hai người sửa chồng một chứng từ. <b>Kết chuyển chi phí 621/622/627 vào 154</b> (cho hệ thống TK có các TK này).
+<b>Thuyết minh báo cáo tài chính</b> theo mẫu nhập vào.</p>
+<p><b>Báo cáo tài chính / thuyết minh:</b> ứng dụng chưa có mẫu đã kiểm chứng theo văn bản chính thức; mẫu đi kèm chỉ là mẫu thử nghiệm kỹ thuật và
+luôn mang cảnh báo «CHƯA KIỂM CHỨNG». Chưa có: tờ khai điện tử theo cấu trúc cơ quan thuế, biểu thuế TNCN.</p>
 <h3>Lưu ý pháp lý</h3>
 <p>Chế độ kế toán, hệ thống tài khoản, thuế suất trong dữ liệu mẫu chưa được kiểm chứng; cần đối chiếu văn bản gốc
 trước khi áp dụng. Báo cáo của ứng dụng là báo cáo hỗ trợ tính toán, không phải tờ khai điện tử theo cấu trúc của cơ

@@ -271,7 +271,7 @@ class MainWindow(QMainWindow):
         s = self.session
         c = s.company
         self.st["user"].setText(f"Người dùng: {s.user.full_name} ({s.user.role_name})")
-        self.st["data"].setText(f"Dữ liệu: {Path(s.db.path).name}")
+        self.st["data"].setText(f"Dữ liệu: {s.db.display_name}")
         self.st["company"].setText(f"Doanh nghiệp: {c['name'] if c else ''}")
         self._update_conn()
         self._tick()
@@ -292,9 +292,10 @@ class MainWindow(QMainWindow):
         self.cb_company.setCurrentIndex(max(0, self.cb_company.findData(self.session.company_id)))
         self.cb_company.blockSignals(False)
         self.cb_data.clear()
-        self.cb_data.addItem(Path(self.session.db.path).name, "current")
+        self.cb_data.addItem(self.session.db.display_name, "current")
         self.cb_data.addItem("Mở dữ liệu khác…", "open")
         self.cb_data.addItem("Tạo dữ liệu mới…", "new")
+        self.cb_data.addItem("Kết nối PostgreSQL (nhiều người dùng)…", "pg")
         self.cb_data.setToolTip(self.session.db.path)
         self._load_years()
 
@@ -357,7 +358,11 @@ class MainWindow(QMainWindow):
         if not self.session.user.can("admin"):
             error(self, "Chỉ quản trị hệ thống được mở hoặc tạo dữ liệu kế toán khác.", "Không có quyền")
             return
-        from ketoan.app import switch_database
+        from ketoan.app import connect_postgres, switch_database
+        if action == "pg":
+            if self._confirm_close_all():
+                connect_postgres(self)
+            return
         if action == "open":
             p, _ = QFileDialog.getOpenFileName(self, "Mở dữ liệu kế toán", str(self.app_dirs["data"]), "Dữ liệu kế toán (*.db)")
         else:
@@ -605,8 +610,8 @@ class MainWindow(QMainWindow):
             return p3.PrintPackView(self)
         if key == "s_yearend":
             return p3.YearEndView(self)
-        if key in ("bc_cdkt", "bc_kqkd", "bc_lctt"):
-            return p3r.FinStatementView(self, {"bc_cdkt": "BS", "bc_kqkd": "IS", "bc_lctt": "CF"}[key])
+        if key in ("bc_cdkt", "bc_kqkd", "bc_lctt", "bc_tm"):
+            return p3r.FinStatementView(self, {"bc_cdkt": "BS", "bc_kqkd": "IS", "bc_lctt": "CF", "bc_tm": "TM"}[key])
         if key == "t_gtgt":
             return p3r.VatView(self)
         if key == "t_doichieu":

@@ -1,13 +1,11 @@
 """Kiểm thử giai đoạn 3: TSCĐ, CCDC, giá thành, mẫu báo cáo, thuế hỗ trợ, chuyển số dư cuối năm."""
 from __future__ import annotations
 
-import shutil
 from decimal import Decimal
 
 import pytest
 
 from ketoan.data.db import SCHEMA_FILE, Database
-from ketoan.data.seed import create_database
 from ketoan.services.asset_service import AssetService, PrepaidService
 from ketoan.services.auth_service import authenticate
 from ketoan.services.closing_service import ClosingService
@@ -21,20 +19,9 @@ from ketoan.services.voucher_service import VoucherService
 from ketoan.services.yearend_service import YearEndService
 
 
-@pytest.fixture(scope="module")
-def demo_path(tmp_path_factory):
-    p = tmp_path_factory.mktemp("db3") / "demo.db"
-    create_database(p).close()
-    return p
-
-
 @pytest.fixture()
-def s(demo_path, tmp_path):
-    p = tmp_path / "work.db"
-    shutil.copy(demo_path, p)
-    db = Database(p)
-    yield Session(db, authenticate(db, "admin", "admin@123"), company_id=1)
-    db.close()
+def s(factory):
+    return factory()
 
 
 def s2_of(s):
@@ -49,7 +36,7 @@ def test_migration_v3(tmp_path):
     db = Database(tmp_path / "v1.db")
     db.conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
     db.execute("INSERT INTO meta VALUES('schema_version','1')")
-    assert db.migrate() == [2, 3] and db.schema_version() == 3
+    assert db.migrate() == [2, 3, 4] and db.schema_version() == 4
     for t in ("prepaid_item", "period_run", "cost_sheet", "report_template", "report_line", "tax_adjustment", "tax_param"):
         assert db.scalar("SELECT 1 FROM sqlite_master WHERE name=?", (t,)), t
 
@@ -240,3 +227,54 @@ def test_year_end_carry_forward(s):
     assert tb.total.ob_d == tb.total.ob_c == sum(r["d"] for r in ob) and all(v == 0 for v in tb.balanced.values())
     assert s.db.scalar("SELECT COUNT(*) FROM opening_stock WHERE company_id=1 AND year=2027") >= 1
     assert s.db.scalar("SELECT COUNT(*) FROM fiscal_year WHERE company_id=1 AND year=2027") == 1
+
+
+# ------------------------------------------------------------------ giai đoạn 4: chi phí sản xuất vào 154, thuyết minh
+def _add_cost_accounts(s2):
+    for code, name in (("621", "Chi phí nguyên liệu, vật liệu trực tiếp"), ("622", "Chi phí nhân công trực tiếp"), ("627", "Chi phí sản xuất chung")):
+        s2.db.execute("INSERT INTO account(company_id, code, name, level, nature, is_detail) VALUES(?,?,?,1,'N',1)", (s2.company_id, code, name))
+
+
+def test_overhead_transfer_to_154(s):
+    from ketoan.services.overhead_service import OverheadService
+    s2 = s2_of(s)
+    ov = OverheadService(s2)
+    with pytest.raises(BusinessError):
+        ov.preview(2026, 5, ["621", "622"], ["627"])                       # chưa có TK 621/622/627 trong danh mục
+    _add_cost_accounts(s2)
+    vs = VoucherService(s2)
+    vid = vs.save({"vtype": "PKT", "voucher_date": "2026-05-10", "posting_date": "2026-05-10", "description": "Chi phí tháng 5"},
+                  [{"debit_account": "621", "credit_account": "334", "amount": 60_000_000, "project": "CT01"},
+                   {"debit_account": "622", "credit_account": "334", "amount": 40_000_000, "project": "CT01"},
+                   {"debit_account": "621", "credit_account": "334", "amount": 50_000_000, "project": "CT02"},
+                   {"debit_account": "627", "credit_account": "334", "amount": 10_000_000},                  # chung, chưa gắn đối tượng
+                   {"debit_account": "627", "credit_account": "334", "amount": 4_000_000, "project": "CT02"}])  # chung, đã gắn
+    vs.post(vid)
+    pv = ov.preview(2026, 5, ["621", "622"], ["627"], "DIRECT")
+    got: dict = {}
+    for l in pv["lines"]:
+        got[(l["project_code"], l["account"])] = got.get((l["project_code"], l["account"]), 0) + l["amount"]
+    # tiêu thức: CT01 100.000.000, CT02 50.000.000 → 10.000.000 chia 6.666.667 + 3.333.333; CT02 còn 4.000.000 đã gắn sẵn
+    assert got[("CT01", "627")] == 6_666_667 and got[("CT02", "627")] == 3_333_333 + 4_000_000
+    assert pv["total"] == 164_000_000 and not pv["warnings"]
+    labor = ov.preview(2026, 5, ["621", "622"], ["627"], "LABOR")
+    assert sum(l["amount"] for l in labor["lines"] if l["project_code"] == "CT01" and l["account"] == "627") == 10_000_000   # chỉ CT01 có 622
+    vid2 = ov.apply(2026, 5, ["621", "622"], ["627"])
+    assert VoucherService(s2).get(vid2)["status"] == "DRAFT"
+    with pytest.raises(BusinessError):
+        ov.apply(2026, 5, ["621", "622"], ["627"])                          # không chạy trùng
+    VoucherService(s2).post(vid2)
+    rows, _ = CostService(s2).calculate("GD", "2026-05-01", "2026-05-31")
+    assert {r.code: r.direct for r in rows} == {"CT01": 100_000_000 + 6_666_667, "CT02": 50_000_000 + 7_333_333}   # 154 nhận đủ chi phí
+    assert balanced(s2)
+    ov.undo(2026, 5)
+    assert not s2.db.scalar("SELECT 1 FROM voucher WHERE id=?", (vid2,))
+
+
+def test_notes_template_kind(s):
+    eng = ReportEngine(s)
+    tid = eng.import_template("TM1", "Thuyết minh thử", "TM", "", "", "Mẫu thử", [
+        {"code": "I", "label": "I. Đặc điểm hoạt động của doanh nghiệp", "formula": "", "bold": True},
+        {"code": "V1", "label": "Tiền và tương đương tiền", "formula": "DN(111,112)", "indent": 1}])
+    lines = {l["code"]: l for l in eng.evaluate(tid, "2026-01-01", "2026-12-31")}
+    assert lines["I"]["value"] is None and lines["V1"]["value"] > 0

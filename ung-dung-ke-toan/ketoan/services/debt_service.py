@@ -116,7 +116,8 @@ class DebtService:
             FROM ledger_entry e JOIN voucher v ON v.id=e.voucher_id
             WHERE e.company_id=? AND e.account_code LIKE ? AND e.posting_date BETWEEN ? AND ? AND e.partner_id IS NOT NULL
             {pcond.replace('partner_id', 'e.partner_id')}
-            GROUP BY e.partner_id, e.voucher_id ORDER BY v.posting_date, e.voucher_id""",
+            GROUP BY e.partner_id, e.voucher_id, v.number, v.posting_date, v.invoice_no, v.invoice_series,
+                     v.invoice_date, v.due_date ORDER BY v.posting_date, e.voucher_id""",
                              [c, acc + "%", f"{year}-01-01", as_of] + pp)
         payments: dict[int, int] = defaultdict(int)
         for r in rows:

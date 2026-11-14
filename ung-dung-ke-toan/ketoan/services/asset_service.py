@@ -100,6 +100,7 @@ class _RunMixin:
         if post:
             self.s.require("post", "ghi sổ chứng từ khấu hao / phân bổ")
         with self.db.transaction():
+            self.db.advisory_lock(f"period-run:{self.s.company_id}:{self.kind}")      # tuần tự giữa nhiều người dùng
             self._check_run(year, month)
             rows = [r for r in self.preview(year, month) if r.amount]
             if not rows:

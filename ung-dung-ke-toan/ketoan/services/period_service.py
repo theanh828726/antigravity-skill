@@ -16,7 +16,7 @@ class PeriodService:
                                                  (self.s.company_id,))]
 
     def ensure_year(self, year: int):
-        self.db.execute("INSERT OR IGNORE INTO fiscal_year(company_id, year, start_date, end_date) VALUES(?,?,?,?)",
+        self.db.execute("INSERT INTO fiscal_year(company_id, year, start_date, end_date) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                         (self.s.company_id, year, f"{year}-01-01", f"{year}-12-31"))
 
     def fiscal_year_of(self, d: str):
@@ -41,7 +41,8 @@ class PeriodService:
     def lock(self, year: int, month: int):
         self.s.require("lock", "khóa kỳ")
         with self.db.transaction():
-            self.db.execute("INSERT OR REPLACE INTO period_lock(company_id, year, month, locked_by, locked_at) VALUES(?,?,?,?,?)",
+            self.db.execute("""INSERT INTO period_lock(company_id, year, month, locked_by, locked_at) VALUES(?,?,?,?,?)
+                               ON CONFLICT(company_id, year, month) DO UPDATE SET locked_by=excluded.locked_by, locked_at=excluded.locked_at""",
                             (self.s.company_id, year, month, self.s.user.username,
                              datetime.now().isoformat(timespec="seconds")))
             self.s.audit("Khóa kỳ", "period_lock", f"{month:02d}/{year}")

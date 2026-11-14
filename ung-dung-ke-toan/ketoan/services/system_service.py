@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from ketoan.data.db import APP_SIGNATURE
+from ketoan.data.db import APP_SIGNATURE, DatabaseError
 from ketoan.domain.money import round_money
 from ketoan.services.context import BusinessError, Session
 from ketoan.services.period_service import PeriodService
@@ -115,8 +115,11 @@ class BackupService:
     def backup(self, target: str | Path | None = None) -> Path:
         self.s.require("admin", "sao lưu dữ liệu")
         self.dir.mkdir(parents=True, exist_ok=True)
-        target = Path(target) if target else self.dir / f"ketoan_{datetime.now():%Y%m%d_%H%M%S}.db"
-        self.db.backup_to(target)
+        target = Path(target) if target else self.dir / f"ketoan_{datetime.now():%Y%m%d_%H%M%S}{self.db.backup_ext}"
+        try:
+            self.db.backup_to(target)
+        except DatabaseError as e:
+            raise BusinessError(str(e)) from None
         with self.db.transaction():
             self.s.audit("Sao lưu dữ liệu", "file", str(target))
         return target
@@ -124,7 +127,7 @@ class BackupService:
     def list_backups(self):
         if not self.dir.exists():
             return []
-        return sorted(self.dir.glob("*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
+        return sorted(self.dir.glob("*" + self.db.backup_ext), key=lambda p: p.stat().st_mtime, reverse=True)
 
     @staticmethod
     def validate_file(path: str | Path):
@@ -141,15 +144,24 @@ class BackupService:
             raise BusinessError(f"File sao lưu bị lỗi toàn vẹn: {integrity}")
 
     def restore(self, source: str | Path) -> Path:
-        """Khôi phục: tự sao lưu dữ liệu hiện tại trước, sau đó chép đè bằng SQLite backup API."""
+        """Khôi phục: tự sao lưu dữ liệu hiện tại trước rồi ghi đè (SQLite: backup API; PostgreSQL: pg_restore --clean)."""
         self.s.require("admin", "khôi phục dữ liệu")
-        self.validate_file(source)
-        safety = self.backup(self.dir / f"truoc_khoi_phuc_{datetime.now():%Y%m%d_%H%M%S}.db")
-        src = sqlite3.connect(str(source))
-        try:
-            src.backup(self.db.conn)
-        finally:
-            src.close()
+        stamp = f"truoc_khoi_phuc_{datetime.now():%Y%m%d_%H%M%S}{self.db.backup_ext}"
+        if self.db.dialect == "postgresql":
+            try:
+                self.db.validate_dump(source)
+                safety = self.backup(self.dir / stamp)
+                self.db.restore_from(source)
+            except DatabaseError as e:
+                raise BusinessError(str(e)) from None
+        else:
+            self.validate_file(source)
+            safety = self.backup(self.dir / stamp)
+            src = sqlite3.connect(str(source))
+            try:
+                src.backup(self.db.conn)
+            finally:
+                src.close()
         self.db.migrate()                     # bản sao lưu từ phiên bản cũ => nâng cấp lược đồ
         with self.db.transaction():
             self.s.audit("Khôi phục dữ liệu", "file", str(source), {"ban_sao_an_toan": str(safety)})
