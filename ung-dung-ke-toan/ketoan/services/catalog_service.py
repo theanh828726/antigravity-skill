@@ -289,7 +289,7 @@ class CatalogService:
                 raise BusinessError(f"'{rec['code']}' đã được sử dụng trên chứng từ/số dư, không thể xóa. "
                                     "Có thể bỏ chọn «Đang dùng» để ngừng sử dụng.")
         with self.db.transaction():
-            self.db.execute(f"DELETE FROM {cat.table} WHERE id=?", (rec_id,))
+            self.db.execute(f"DELETE FROM {cat.table} WHERE id=? AND company_id=?", (rec_id, self.s.company_id))
             self.s.audit("Xóa danh mục", cat.table, rec["code"], dict(rec))
 
     # ------------------------------------------------------------------ nhập Excel
