@@ -361,11 +361,34 @@ class BackupView(QWidget):
             b.clicked.connect(fn)
             b.setEnabled(self.s.user.can("admin"))
             bar.addWidget(b)
+        if self.s.db.dialect == "sqlite":
+            b = tool_button("Chuyển dữ liệu sang PostgreSQL…", "import", None, "Chuyển toàn bộ dữ liệu này sang CSDL PostgreSQL TRỐNG (nhiều người dùng)")
+            b.clicked.connect(self.to_postgres)
+            b.setEnabled(self.s.user.can("admin"))
+            bar.addWidget(b)
         bar.addStretch(1)
         root.addLayout(bar)
         self.table = ReportTable()
         root.addWidget(self.table, 1)
         self.refresh()
+
+    def to_postgres(self):
+        from PySide6.QtGui import QGuiApplication
+        from PySide6.QtCore import Qt as _Qt
+        from ketoan.data.transfer import transfer_sqlite_to_postgres
+        from ketoan.ui.pg_dialog import PgConnectDialog
+        dlg = PgConnectDialog(self, allow_init=False)
+        if not dlg.exec() or not confirm(self, "Chuyển TOÀN BỘ dữ liệu hiện tại sang CSDL PostgreSQL đã chọn?\nCSDL đích phải TRỐNG; dữ liệu nguồn không bị thay đổi. "
+                                              "Nên sao lưu trước. Nếu lỗi, CSDL đích được hoàn tác sạch."):
+            return
+        QGuiApplication.setOverrideCursor(_Qt.WaitCursor)
+        try:
+            ok, res = run(self, transfer_sqlite_to_postgres, self.s.db.path, dlg.url())
+        finally:
+            QGuiApplication.restoreOverrideCursor()
+        if ok:
+            info(self, f"Đã chuyển {res.total_rows} dòng của {len(res.tables)} bảng; {len(res.checks)} phép đối chiếu đều khớp.\n"
+                       "Từ nay hãy mở ứng dụng bằng «Kết nối PostgreSQL…» với CSDL này.")
 
     def refresh(self):
         from datetime import datetime

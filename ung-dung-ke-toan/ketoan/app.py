@@ -78,6 +78,9 @@ def _login_and_switch(window, db, target: str, new_data: bool = False) -> bool:
     if not dlg.exec():
         db.close()
         return False
+    if dlg.user.must_change and not _force_password_change(db, dlg.user.username, window):
+        db.close()
+        return False
     old = window.session.db
     window.session = Session(db, dlg.user)
     old.close()
@@ -86,6 +89,11 @@ def _login_and_switch(window, db, target: str, new_data: bool = False) -> bool:
     save_settings(window.app_dirs, s)
     window.reload_all()
     return True
+
+
+def _force_password_change(db, username: str, parent=None) -> bool:
+    from ketoan.ui.password_dialog import ChangePasswordDialog
+    return bool(ChangePasswordDialog(db, username, forced=True, parent=parent).exec())
 
 
 def switch_database(window, path: str, create: bool = False):
@@ -137,6 +145,7 @@ def connect_postgres(window):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=APP_NAME)
     parser.add_argument("--db", help="Đường dẫn file SQLite hoặc URL postgresql://người_dùng[:mật_khẩu]@máy:5432/tên_csdl")
+    parser.add_argument("--to-postgres", metavar="URL", help="Chuyển dữ liệu từ file SQLite (--db) sang CSDL PostgreSQL TRỐNG rồi thoát")
     parser.add_argument("--init", action="store_true", help="Với PostgreSQL: khởi tạo CSDL trống (chưa có dữ liệu) rồi thoát")
     parser.add_argument("--demo", action="store_true", help="Kèm --init: nạp dữ liệu minh họa")
     parser.add_argument("--company", default="", help="Kèm --init: tên doanh nghiệp")
@@ -144,6 +153,21 @@ def main(argv=None):
     parser.add_argument("--user", help=argparse.SUPPRESS)
     parser.add_argument("--password", help=argparse.SUPPRESS)
     args, qt_args = parser.parse_known_args(argv)
+
+    if args.to_postgres:
+        from ketoan.data.transfer import transfer_sqlite_to_postgres
+        src = args.db or load_settings(app_dirs()).get("last_db") or ""
+        if not src or is_pg_url(src):
+            print("Cần --db <file SQLite nguồn>.")
+            return 2
+        try:
+            res = transfer_sqlite_to_postgres(src, args.to_postgres,
+                                              lambda t, d, n: print(f"  {t}: {d}/{n}") if d == n else None)
+        except Exception as e:  # noqa: BLE001
+            print(f"CHUYỂN KHÔNG THÀNH CÔNG (CSDL đích không bị thay đổi): {e}")
+            return 1
+        print(f"Đã chuyển {res.total_rows} dòng của {len(res.tables)} bảng; {len(res.checks)} phép đối chiếu đều khớp.")
+        return 0
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication([sys.argv[0]] + qt_args)
@@ -194,6 +218,9 @@ def main(argv=None):
         if not dlg.exec():
             return 0
         user = dlg.user
+        if user.must_change:                       # mật khẩu mặc định: bắt buộc đổi trước khi làm việc
+            if not _force_password_change(db, user.username):
+                return 0
     settings["last_db"] = strip_password(target) if is_pg_url(target) else str(target)     # không lưu mật khẩu
     save_settings(dirs, settings)
 

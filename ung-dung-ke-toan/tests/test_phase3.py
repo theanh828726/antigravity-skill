@@ -36,7 +36,7 @@ def test_migration_v3(tmp_path):
     db = Database(tmp_path / "v1.db")
     db.conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
     db.execute("INSERT INTO meta VALUES('schema_version','1')")
-    assert db.migrate() == [2, 3, 4, 5] and db.schema_version() == 5
+    assert db.migrate() == [2, 3, 4, 5, 6] and db.schema_version() == 6
     for t in ("prepaid_item", "period_run", "cost_sheet", "report_template", "report_line", "tax_adjustment", "tax_param"):
         assert db.scalar("SELECT 1 FROM sqlite_master WHERE name=?", (t,)), t
 

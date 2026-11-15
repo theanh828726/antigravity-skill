@@ -12,6 +12,7 @@ dịch vụ hóa đơn; thẻ không nhận diện được sẽ được báo t
 """
 from __future__ import annotations
 
+import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -93,8 +94,11 @@ def parse_file(path: str | Path) -> XmlInvoice:
     p = Path(path)
     if p.stat().st_size > MAX_XML_BYTES:
         raise BusinessError(f"{p.name}: file quá lớn (> 5 MB).")
+    raw = p.read_bytes()
+    if re.search(rb"<!\s*(DOCTYPE|ENTITY)", raw, re.I):
+        raise BusinessError(f"{p.name}: file XML có khai báo DOCTYPE/ENTITY – không được chấp nhận vì lý do an toàn.")
     try:
-        root = ET.parse(str(p)).getroot()     # expat không tải thực thể ngoài
+        root = ET.fromstring(raw)
     except ET.ParseError as e:
         raise BusinessError(f"{p.name}: không đọc được XML ({e}).") from None
     dl = _deep(root, "DLHDon")

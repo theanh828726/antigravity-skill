@@ -41,7 +41,7 @@ Bộ cài `.exe` (tùy chọn): cài Inno Setup 6 rồi chạy
 | Sao lưu | Hệ thống → Sao lưu – khôi phục → *Sao lưu ngay* (thư mục `...\KeToan\backup\`) |
 | Khôi phục | Chọn bản sao lưu → *Khôi phục*; ứng dụng tự sao lưu dữ liệu hiện tại trước (file `truoc_khoi_phuc_*.db`) |
 | Mở / tạo dữ liệu khác | Thanh điều khiển → *Dữ liệu kế toán* → *Mở dữ liệu khác…* / *Tạo dữ liệu mới…* (quyền quản trị) |
-| Mật khẩu | Lưu dạng băm PBKDF2-SHA256; **đổi mật khẩu các tài khoản mặc định** ngay khi dùng thật (Hệ thống → Người dùng & phân quyền) |
+| Mật khẩu | Băm PBKDF2-SHA256 (600.000 vòng); sai 5 lần thì khóa tạm 5 phút; mật khẩu mới ≥ 8 ký tự, có chữ và số. Đăng nhập bằng mật khẩu mặc định (`admin@123`, `ktt@123`, `ktv@123`, `xem@123`) **buộc đổi ngay**; đổi bất kỳ lúc nào ở Hệ thống → Đổi mật khẩu. Quản trị viên đặt lại mật khẩu người khác ở Người dùng & phân quyền |
 
 **Quan trọng:** SQLite dành cho **một người dùng trên một máy**. Không đặt file `.db` trong thư mục chia sẻ mạng (LAN) để nhiều người cùng
 mở – có nguy cơ hỏng dữ liệu. Nhiều người dùng cùng làm việc: dùng **PostgreSQL** (mục dưới).
@@ -62,10 +62,14 @@ mở – có nguy cơ hỏng dữ liệu. Nhiều người dùng cùng làm vi�
    chặn kèm thông báo người sửa trước; chạy khấu hao/phân bổ/kết chuyển tuần tự; khóa kỳ có hiệu lực ngay với mọi người dùng.
 6. **Sao lưu/khôi phục:** nút trong ứng dụng dùng `pg_dump`/`pg_restore` (cần PostgreSQL client tools trong PATH trên máy chạy ứng dụng; file `.dump`). Khôi phục
    ghi đè CSDL – nên thực hiện khi không ai đang làm việc. Doanh nghiệp vẫn nên có sao lưu định kỳ ở phía máy chủ (pg_dump theo lịch, WAL archiving).
-7. **Chuyển từ SQLite sang PostgreSQL:** chưa có chức năng chuyển dữ liệu tự động; với dữ liệu thật hãy khởi tạo CSDL mới rồi nhập danh mục (Excel), số dư đầu kỳ và chứng từ.
+7. **Chuyển dữ liệu từ SQLite sang PostgreSQL:** tạo CSDL PostgreSQL **trống** (bước 1, không chạy `--init`), sao lưu file SQLite, rồi chạy
+   `UngDungKeToan.exe --db "C:\đường-dẫn\ketoan.db" --to-postgres postgresql://ketoan@máy-chủ:5432/ketoan`
+   (hoặc *Hệ thống → Sao lưu – khôi phục → Chuyển dữ liệu sang PostgreSQL…*).
+   Việc chuyển nằm trong một giao dịch: lỗi thì CSDL đích vẫn trống; thành công thì ứng dụng đã đối chiếu số dòng từng bảng và tổng Nợ/Có. Giữ nguyên mã bản ghi và mật khẩu
+   người dùng. Không ghi đè CSDL đích đã có dữ liệu; file nguồn không bị thay đổi. Sau khi chuyển, mọi người mở ứng dụng bằng kết nối PostgreSQL.
 
 ## Bắt đầu với doanh nghiệp thật
-1. *Dữ liệu kế toán → Tạo dữ liệu mới…*, nhập tên doanh nghiệp, đăng nhập `admin / admin@123`, **đổi mật khẩu**.
+1. *Dữ liệu kế toán → Tạo dữ liệu mới…*, nhập tên doanh nghiệp, đăng nhập `admin / admin@123` (ứng dụng sẽ buộc đổi mật khẩu ngay).
 2. *Cài đặt* → cập nhật thông tin doanh nghiệp, chọn **chế độ kế toán + ngày hiệu lực** (sau khi đã kiểm chứng văn bản).
 3. *Danh mục* → rà soát hệ thống tài khoản; nhập khách hàng, NCC, vật tư… bằng *Nhập Excel* (có ánh xạ cột, kiểm tra trước).
 4. *Danh mục → Số dư đầu kỳ* → nhập số dư đầu năm, bảo đảm *Cân đối ✓*.

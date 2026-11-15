@@ -50,6 +50,8 @@ def export_excel(path: str, title: str, subtitle: str, company: str, headers: li
             if (j - 1) in money_cols and val in (0, None):
                 val = None
             c = ws.cell(r0 + 1 + i, j, val)
+            if isinstance(val, str) and val[:1] in ("=", "+", "-", "@"):
+                c.data_type = "s"            # dữ liệu nhập từ bên ngoài không được thực thi như công thức Excel
             c.border = border
             if (j - 1) in money_cols:
                 c.number_format = '#,##0;(#,##0)'

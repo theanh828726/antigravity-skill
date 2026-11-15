@@ -142,7 +142,7 @@ def create_database(path: str | Path, demo: bool = True, company_name: str = "",
                         "Luật Thuế GTGT và văn bản hướng dẫn – mức áp dụng từng thời kỳ cần kiểm chứng"))
         ensure_default_roles(db)
         for u, n, r, p in DEMO_USERS:
-            create_user(db, u, n, r, p)
+            create_user(db, u, n, r, p, enforce_policy=False)
     admin = CurrentUser("admin", "Quản trị hệ thống", "ADMIN", "Quản trị hệ thống", {"admin"})
     if demo:
         _seed_demo(db, admin)

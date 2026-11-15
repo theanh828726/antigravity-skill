@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse
 
-SCHEMA_VERSION = "5"
+SCHEMA_VERSION = "6"
 
 # Migration theo phiên bản: schema.sql là phiên bản 1; các phiên bản sau áp dụng tuần tự,
 # kể cả với file dữ liệu tạo từ phiên bản cũ (nâng cấp tại chỗ, trong một giao dịch).
@@ -93,6 +93,12 @@ MIGRATIONS: dict[int, list] = {   # phần tử: câu SQL dùng chung, hoặc (d
         # chiều của bút toán (D: Nợ, C: Có) – cần để giữ được biến động số lượng kho khi thành tiền bằng 0
         "ALTER TABLE ledger_entry ADD COLUMN side TEXT",
         "UPDATE ledger_entry SET side = CASE WHEN debit > 0 THEN 'D' ELSE 'C' END WHERE side IS NULL",
+    ],
+    6: [
+        # an toàn đăng nhập: chống dò mật khẩu (khóa tạm), số vòng băm lưu theo từng tài khoản để nâng cấp dần
+        "ALTER TABLE app_user ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE app_user ADD COLUMN locked_until TEXT",
+        "ALTER TABLE app_user ADD COLUMN pwd_rounds INTEGER NOT NULL DEFAULT 120000",
     ],
 }
 SCHEMA_FILE = Path(__file__).with_name("schema.sql")

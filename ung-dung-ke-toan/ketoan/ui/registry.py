@@ -113,6 +113,7 @@ FUNCS: dict[str, Func] = dict([
     _f("s_backup", "Sao lưu – khôi phục", "backup", "he_thong"),
     _f("s_company", "Doanh nghiệp & chế độ kế toán", "settings", "he_thong"),
     _f("s_closing", "Kết chuyển cuối kỳ", "scale", "tong_hop"),
+    _f("s_password", "Đổi mật khẩu", "lock", "he_thong"),
     _f("s_yearend", "Chuyển số dư cuối năm", "refresh", "he_thong", 3),
     _f("dashboard", "Tổng quan", "home", "he_thong"),
 ])
@@ -143,6 +144,6 @@ MENU = [
     ("Giá thành", "factory", [("GIÁ THÀNH", ["gt_ct", "gt_sct", "gt_dm", "gt_kdm", "gt_gd", "gt_dv", "gt_vt", "gt_kdd"])]),
     ("Ngân hàng – Quỹ", "bank", [("NGÂN HÀNG – QUỸ", ["v_PT", "v_PC", "v_NH", "r_soquy", "r_sotgnh"])]),
     ("In hồ sơ", "printer", [("IN HỒ SƠ", ["m_inhs"])]),
-    ("Hệ thống", "settings", [("HỆ THỐNG", ["s_company", "s_users", "s_lock", "s_closing", "s_yearend", "s_alerts", "s_audit",
+    ("Hệ thống", "settings", [("HỆ THỐNG", ["s_company", "s_users", "s_lock", "s_closing", "s_yearend", "s_password", "s_alerts", "s_audit",
                                             "s_backup"])]),
 ]

@@ -527,6 +527,11 @@ class MainWindow(QMainWindow):
             from ketoan.ui.system_views import ClosingDialog
             ClosingDialog(self, self).exec()
             return None
+        if key == "s_password":
+            from ketoan.ui.password_dialog import ChangePasswordDialog
+            if ChangePasswordDialog(self.session.db, self.session.user.username, parent=self).exec():
+                info(self, "Đã đổi mật khẩu.")
+            return None
         if key == "m_tinhgia":
             from ketoan.ui.phase2_views import CostingDialog
             CostingDialog(self, self).exec()

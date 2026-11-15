@@ -4,7 +4,7 @@ Ngày kiểm tra: 14/11/2026 · Python 3.13 · PySide6 6.12 · SQLite · giao di
 
 ```
 $ QT_QPA_PLATFORM=offscreen python -m pytest -v tests
-95 passed   (53 bài trên SQLite + 42 lượt trên PostgreSQL 16, gồm 6 bài đa người dùng)
+113 passed   (64 bài trên SQLite + 49 lượt trên PostgreSQL 16, gồm 6 bài đa người dùng)
 ```
 
 ## 1. Dữ liệu minh họa (`sample_data/ketoan_demo.db`)
@@ -117,6 +117,23 @@ số nguyên, `LIKE` không phân biệt hoa thường, `GROUP BY` chặt chẽ,
 | Kết chuyển CP 621/622/627 vào 154: chặn khi thiếu TK; phân bổ chi phí chung 10.000.000 → 6.666.667 + 3.333.333 theo CP trực tiếp (hoặc 100% theo nhân công); phần đã gắn đối tượng giữ nguyên; tổng 164.000.000; không chạy trùng; giá thành nhận đủ; hoàn tác | `test_overhead_transfer_to_154` | ✅ |
 | Mẫu thuyết minh (loại TM): dòng chữ không số liệu + dòng lấy số liệu từ sổ | `test_notes_template_kind` | ✅ |
 | Gói PyInstaller: `--init --demo` khởi tạo CSDL PostgreSQL (211 chứng từ) rồi exe đóng gói kết nối và chạy | thủ công + workflow | ✅ |
+
+### Rà soát bảo mật và chuyển dữ liệu (sau Giai đoạn 4)
+| Nội dung | Kiểm thử | Kết quả |
+|---|---|---|
+| Sai mật khẩu hoặc tên không tồn tại → cùng một thông báo chung, có ghi nhật ký | `test_wrong_password_is_generic_and_audited` | ✅ |
+| Sai 5 lần → khóa tạm, đúng mật khẩu vẫn bị từ chối; hết hạn khóa đăng nhập lại được, đếm lỗi về 0 | `test_lockout_after_repeated_failures_then_expires` | ✅ |
+| Mật khẩu mặc định buộc đổi; chính sách mật khẩu; đổi cần mật khẩu cũ; mật khẩu cũ mất hiệu lực | `test_default_password_forces_change_and_policy` | ✅ |
+| Số vòng băm tự nâng cấp khi đăng nhập thành công | `test_hash_rounds_upgraded_on_login` | ✅ |
+| Người dùng mới phải đạt chính sách; phân quyền kiểm ở tầng nghiệp vụ (người xem không lưu, kế toán viên không ghi sổ, người xem không xóa) | `test_new_users_must_meet_policy`, `test_permissions_enforced_in_service_layer` | ✅ |
+| Ký tự SQL trong dữ liệu nhập/tìm kiếm chỉ là dữ liệu | `test_sql_metacharacters_are_data_not_code` | ✅ |
+| Xuất Excel: ô bắt đầu bằng `=` lưu dạng văn bản, không thành công thức | `test_excel_export_neutralizes_formulas` | ✅ |
+| Hóa đơn XML có DOCTYPE/ENTITY (tấn công mở rộng thực thể) bị từ chối | `test_xml_with_doctype_rejected` | ✅ |
+| **Chuyển SQLite → PostgreSQL**: số liệu sổ sách (cả 2 doanh nghiệp) giống hệt từng dòng; bộ đếm id đặt lại nên chứng từ mới không trùng; lỗi giữa chừng → đích vẫn trống (kể cả lược đồ); chạy lại thành công; đích đã có dữ liệu bị từ chối | `test_transfer_sqlite_to_postgres_is_exact`, `test_transfer_refuses_non_empty_target_and_rolls_back_on_error` | ✅ |
+| CLI thật: chuyển bộ dữ liệu minh họa → 2.768 dòng, 31 bảng, 37 phép đối chiếu khớp; chạy lần hai bị từ chối | thủ công | ✅ |
+
+Đã xem xét nhưng không cần sửa: câu SQL đều tham số hóa (chỉ nội suy tên bảng/cột lấy từ hằng số nội bộ); công thức báo cáo dùng bộ phân tích riêng, không `eval`; dữ liệu đưa vào HTML in/PDF đã escape.
+Chưa làm: khóa màn hình khi không hoạt động, xác thực hai yếu tố, mã hóa file SQLite, kiểm thử xâm nhập độc lập.
 
 CI (`ketoan-windows.yml`) chạy bộ kiểm thử với dịch vụ PostgreSQL 16 trên Linux và bộ kiểm thử SQLite + đóng gói trên Windows.
 

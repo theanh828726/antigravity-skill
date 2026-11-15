@@ -10,6 +10,8 @@ import os
 import shutil
 import uuid
 
+os.environ.setdefault("KETOAN_PBKDF2_ROUNDS", "20000")     # kiểm thử chạy nhanh; sản phẩm dùng 600.000
+
 import pytest
 
 from ketoan.data.db import Database, PostgresDatabase, make_pg_url, parse_pg_url

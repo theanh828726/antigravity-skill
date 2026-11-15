@@ -112,3 +112,55 @@ def test_benign_restore_error_filter():
     assert P.only_benign_restore_errors(benign)                                          # PG 17 → 16: lỗi vô hại
     assert not P.only_benign_restore_errors(benign + '\npg_restore: error: relation "x" does not exist')
     assert not P.only_benign_restore_errors("pg_restore: error: connection to server failed")
+
+
+# ------------------------------------------------------------------ chuyển dữ liệu SQLite → PostgreSQL
+@pytest.fixture()
+def empty_pg_url():
+    import uuid
+    from tests.conftest import _admin_conn, pg_url
+    name = "kt_mig_" + uuid.uuid4().hex[:6]
+    adm = _admin_conn()
+    adm.execute(f'CREATE DATABASE "{name}" TEMPLATE template0 ENCODING \'UTF8\' LC_COLLATE \'C\' LC_CTYPE \'C.UTF-8\'')
+    yield pg_url(name)
+    adm.execute(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+    adm.close()
+
+
+def test_transfer_sqlite_to_postgres_is_exact(templates, empty_pg_url):
+    from ketoan.data.db import Database, PostgresDatabase
+    from ketoan.data.transfer import transfer_sqlite_to_postgres
+    from ketoan.services.auth_service import authenticate
+    from ketoan.services.context import Session
+    from ketoan.services.ledger_service import LedgerService
+    res = transfer_sqlite_to_postgres(templates["sqlite"], empty_pg_url)
+    assert res.ok and res.total_rows > 1000 and res.tables["voucher"] > 200
+    lite, pg = Database(templates["sqlite"]), PostgresDatabase(empty_pg_url)
+    for cid in (1, 2):                                                        # số liệu sổ sách giống hệt nhau ở cả hai doanh nghiệp
+        a = LedgerService(Session(lite, authenticate(lite, "admin", "admin@123"), company_id=cid)).trial_balance("2026-01-01", "2026-12-31")
+        b = LedgerService(Session(pg, authenticate(pg, "admin", "admin@123"), company_id=cid)).trial_balance("2026-01-01", "2026-12-31")
+        assert [(r.code, r.ob_d, r.ob_c, r.ps_d, r.ps_c, r.cb_d, r.cb_c) for r in a.rows] == \
+               [(r.code, r.ob_d, r.ob_c, r.ps_d, r.ps_c, r.cb_d, r.cb_c) for r in b.rows]
+    # bộ đếm tự tăng được đặt lại: lưu chứng từ mới trên PostgreSQL không trùng id/số
+    s = Session(pg, authenticate(pg, "admin", "admin@123"), company_id=1)
+    n_before = pg.scalar("SELECT COUNT(*) FROM voucher WHERE company_id=1 AND vtype='PKT'")
+    vid = VoucherService(s).save(*_simple("sau khi chuyển"))
+    assert vid > lite.scalar("SELECT MAX(id) FROM voucher") and pg.scalar("SELECT COUNT(*) FROM voucher WHERE company_id=1 AND vtype='PKT'") == n_before + 1
+    pg.close(); lite.close()
+
+
+def test_transfer_refuses_non_empty_target_and_rolls_back_on_error(templates, empty_pg_url):
+    from ketoan.data.db import DatabaseError, PostgresDatabase
+    from ketoan.data.transfer import transfer_sqlite_to_postgres
+    def boom(table, done, total):
+        if table == "ledger_entry":
+            raise RuntimeError("mất kết nối giữa chừng (giả lập)")
+    with pytest.raises(RuntimeError):
+        transfer_sqlite_to_postgres(templates["sqlite"], empty_pg_url, boom)
+    pg = PostgresDatabase(empty_pg_url)
+    assert not pg.has_schema()                                                # lỗi giữa chừng → đích vẫn TRỐNG (DDL cũng hoàn tác)
+    pg.close()
+    transfer_sqlite_to_postgres(templates["sqlite"], empty_pg_url)             # chạy lại sau lỗi thành công
+    with pytest.raises(DatabaseError) as e:
+        transfer_sqlite_to_postgres(templates["sqlite"], empty_pg_url)         # lần hai: đích đã có dữ liệu → từ chối, không ghi đè
+    assert "TRỐNG" in str(e.value)

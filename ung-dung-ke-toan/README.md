@@ -63,7 +63,8 @@ Tùy chọn: `--db <file.db>` mở file chỉ định · `--reset-demo` tạo l�
 | **Nhiều người dùng (GĐ4)** | Backend **PostgreSQL** cùng giao diện với SQLite (tự chuyển cú pháp); hộp thoại kết nối + khởi tạo (`--db postgresql://… --init`); khóa dòng khi ghi sổ/bỏ ghi sổ/xóa, đánh số chứng từ bằng khóa tư vấn (không trùng số khi nhiều người nhập cùng lúc), **chặn sửa chồng** (số phiên bản chứng từ), chạy khấu hao/phân bổ/kết chuyển tuần tự; sao lưu/khôi phục bằng pg_dump/pg_restore; **toàn bộ bộ test chạy trên cả hai CSDL** | ✅ GĐ4 |
 | Chi phí sản xuất → 154 (GĐ4) | Cho hệ thống TK có TK 621/622/627: kết chuyển chi phí đã gắn đối tượng, phân bổ chi phí chung chưa gắn theo tiêu thức (tổng CP trực tiếp hoặc nhân công trực tiếp), xem trước → chứng từ nháp → hoàn tác, chặn chạy trùng tháng | ✅ GĐ4 |
 | Thuyết minh BCTC (GĐ4) | Dùng bộ máy mẫu có phiên bản (loại TM: dòng chữ + dòng số liệu từ sổ); mẫu chính thức do người dùng nhập | ✅ GĐ4 (mẫu chính thức: **người dùng nhập**) |
-| Chưa triển khai | Tờ khai điện tử theo cấu trúc cơ quan thuế (cần đặc tả chính thức); biểu thuế TNCN và quyết toán; phân bổ chi phí theo giờ máy/định mức; chuyển dữ liệu tự động SQLite → PostgreSQL; sao lưu PostgreSQL không cần pg_dump | ⏳ |
+| **Bảo mật & chuyển dữ liệu (sau rà soát)** | Chống dò mật khẩu (khóa tạm 5 phút sau 5 lần sai, thông báo lỗi chung không lộ tên đăng nhập, ghi nhật ký đăng nhập); băm PBKDF2-SHA256 600.000 vòng (tự nâng cấp tài khoản cũ khi đăng nhập); chính sách mật khẩu (≥ 8 ký tự, chữ + số) và **buộc đổi mật khẩu mặc định**; chức năng *Đổi mật khẩu*; xuất Excel không để dữ liệu thành công thức; từ chối hóa đơn XML có DOCTYPE/ENTITY; **công cụ chuyển dữ liệu SQLite → PostgreSQL** (một giao dịch, đối chiếu sau khi chuyển, không ghi đè): `python main.py --db file.db --to-postgres <URL>` hoặc nút trong Hệ thống → Sao lưu | ✅ |
+| Chưa triển khai | Tờ khai điện tử theo cấu trúc cơ quan thuế (cần đặc tả chính thức); biểu thuế TNCN và quyết toán; phân bổ chi phí theo giờ máy/định mức; sao lưu PostgreSQL không cần pg_dump; khóa phiên làm việc khi không hoạt động | ⏳ |
 | Nâng cấp dữ liệu | Migration lược đồ theo phiên bản: file dữ liệu GĐ1 (và bản sao lưu cũ khi khôi phục) tự nâng cấp trong một giao dịch | ✅ GĐ2 |
 | GĐ3 | TSCĐ (khấu hao), CCDC (phân bổ), giá thành (8 loại), BCTC theo mẫu, hỗ trợ thuế GTGT/TNDN/TNCN, in hồ sơ | ⏳ ô hiển thị nhãn **GĐ3**, mở ra trang mô tả phạm vi – không giả lập |
 
@@ -102,7 +103,7 @@ ung-dung-ke-toan/
 │   │   └── system_service.py     # doanh nghiệp, chế độ KT, số dư đầu, sao lưu, nhật ký
 │   ├── reports/export.py         # Excel / PDF / in
 │   └── ui/                       # PySide6 – chỉ gọi services, không viết SQL
-├── tests/                        # 95 lượt kiểm thử khi có PostgreSQL (53 trên SQLite + 42 trên PostgreSQL, gồm 6 bài đa người dùng chạy song song nhiều kết nối): nghiệp vụ GĐ1–GĐ4 + giao diện offscreen
+├── tests/                        # 113 lượt kiểm thử khi có PostgreSQL (64 trên SQLite + 49 trên PostgreSQL, gồm 6 bài đa người dùng chạy song song nhiều kết nối): nghiệp vụ GĐ1–GĐ4 + giao diện offscreen
 ├── sample_data/                  # ketoan_demo.db + hoa_don_xml/ (4 hóa đơn XML mẫu)
 ├── packaging/                    # PyInstaller spec, build_windows.bat, Inno Setup
 └── docs/                         # hướng dẫn cài đặt, kết quả kiểm tra, ảnh màn hình

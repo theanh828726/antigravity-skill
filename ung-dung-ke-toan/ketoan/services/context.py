@@ -24,6 +24,7 @@ class CurrentUser:
     role_code: str
     role_name: str
     permissions: set = field(default_factory=set)
+    must_change: bool = False          # đăng nhập bằng mật khẩu mặc định → phải đổi
 
     def can(self, perm: str) -> bool:
         return "admin" in self.permissions or perm in self.permissions
