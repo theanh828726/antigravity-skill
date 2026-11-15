@@ -137,7 +137,7 @@ class AlertService:
         for m in inv.movements(f"{year}-01-01", d_to):
             k = (m["item_id"], m["warehouse_id"])
             q = to_decimal(m["quantity"])
-            bal[k] = bal.get(k, to_decimal(0)) + (q if m["debit"] else -q)
+            bal[k] = bal.get(k, to_decimal(0)) + (q if m["is_in"] else -q)
             if bal[k] < 0 and k not in flagged:
                 flagged[k] = m
         out = []

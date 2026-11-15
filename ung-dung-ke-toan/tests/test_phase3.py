@@ -36,7 +36,7 @@ def test_migration_v3(tmp_path):
     db = Database(tmp_path / "v1.db")
     db.conn.executescript(SCHEMA_FILE.read_text(encoding="utf-8"))
     db.execute("INSERT INTO meta VALUES('schema_version','1')")
-    assert db.migrate() == [2, 3, 4] and db.schema_version() == 4
+    assert db.migrate() == [2, 3, 4, 5] and db.schema_version() == 5
     for t in ("prepaid_item", "period_run", "cost_sheet", "report_template", "report_line", "tax_adjustment", "tax_param"):
         assert db.scalar("SELECT 1 FROM sqlite_master WHERE name=?", (t,)), t
 
@@ -75,7 +75,7 @@ def test_last_month_takes_remainder_and_disposal(s):
     assert "TS9" not in {r.code for r in a.preview(2026, 10)}
     ts1 = s.db.scalar("SELECT id FROM fixed_asset WHERE company_id=1 AND code='TS001'")
     a.dispose(ts1, "2026-09-15")
-    assert "TS001" not in {r.code for r in a.preview(2026, 10)}   # ngừng từ tháng sau tháng ghi giảm
+    assert "TS001" in {r.code for r in a.preview(2026, 9)} and "TS001" not in {r.code for r in a.preview(2026, 10)}   # ngừng từ tháng sau tháng ghi giảm
 
 
 def test_prepaid_allocation_and_validation(s):
@@ -278,3 +278,43 @@ def test_notes_template_kind(s):
         {"code": "V1", "label": "Tiền và tương đương tiền", "formula": "DN(111,112)", "indent": 1}])
     lines = {l["code"]: l for l in eng.evaluate(tid, "2026-01-01", "2026-12-31")}
     assert lines["I"]["value"] is None and lines["V1"]["value"] > 0
+
+
+# ------------------------------------------------------------------ góp ý review PR #1
+def test_zero_price_issue_keeps_stock_movement_until_costing(s):
+    vs, inv = VoucherService(s), InventoryService(s)
+    hh = s.db.scalar("SELECT id FROM item WHERE company_id=1 AND code='HH006'")
+    before = {r.item_code: r for r in inv.nxt("2026-12-01", "2026-12-31")}.get("HH006")
+    vid = vs.save({"vtype": "PXK", "voucher_date": "2026-12-12", "posting_date": "2026-12-12"},
+                  [{"debit_account": "632", "credit_account": "156", "item": "HH006", "warehouse": "KHO01", "quantity": 2, "unit_price": 0}])
+    vs.post(vid)                                                   # đơn giá tạm = 0, chờ tính giá xuất kho
+    rows = s.db.query("SELECT account_code, side, debit, credit, quantity FROM ledger_entry WHERE voucher_id=? AND item_id=? ORDER BY side", (vid, hh))
+    assert [(r["account_code"], r["side"], r["debit"], r["credit"]) for r in rows] == [("156", "C", 0, 0), ("632", "D", 0, 0)] or \
+           [(r["account_code"], r["side"]) for r in rows] == [("156", "C"), ("632", "D")]
+    after = {r.item_code: r for r in inv.nxt("2026-12-01", "2026-12-31")}["HH006"]
+    assert after.out_q - (before.out_q if before else 0) == 2      # số lượng xuất không bị mất
+    pv = inv.costing_preview("2026-12-01", "2026-12-31")
+    assert any(c[4] == vs.get(vid)["number"] and c[2] > 0 for c in pv.changes)   # tính giá xuất kho gán được giá trị cho dòng này
+    inv.costing_apply("2026-12-01", "2026-12-31")
+    assert vs.get(vid)["lines"][0]["amount"] > 0 and balanced(s)
+
+
+def test_depreciation_can_start_in_a_later_month(s):
+    s2 = s2_of(s)                                                   # doanh nghiệp 2 chưa có TSCĐ
+    s2.db.execute("""INSERT INTO fixed_asset(company_id, code, name, asset_account, depreciation_account, expense_account, original_cost,
+                     start_date, useful_months) VALUES(2,'M1','Máy mới','2111','2141','6422',1200,'2026-03-01',12)""")
+    a = AssetService(s2)
+    a.apply(2026, 3)                                               # tháng 01, 02 không có khoản nào → không chặn
+    assert a.assets("2026-03-31")[0]["accumulated"] == 100
+    with pytest.raises(BusinessError):
+        a.apply(2026, 5)                                           # nhưng tháng 4 có khoản mà chưa chạy → vẫn bắt buộc tuần tự
+    a.apply(2026, 4)
+    a.apply(2026, 5)
+
+
+def test_disposal_month_is_still_depreciated(s):
+    a = AssetService(s)
+    ts1 = s.db.scalar("SELECT id FROM fixed_asset WHERE company_id=1 AND code='TS001'")
+    a.dispose(ts1, "2026-09-15")
+    assert "TS001" in {r.code for r in a.preview(2026, 9)}         # tháng ghi giảm vẫn tính khấu hao
+    assert "TS001" not in {r.code for r in a.preview(2026, 10)}    # ngừng từ tháng sau

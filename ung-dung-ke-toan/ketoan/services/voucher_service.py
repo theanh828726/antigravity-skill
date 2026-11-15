@@ -377,20 +377,22 @@ class VoucherService:
             common = (ln["item_id"], ln["warehouse_id"], ln["quantity"], ln["project_id"], ln["department_id"],
                       ln["expense_item_id"])
             desc = ln["description"] or v["description"]
-            if da and a:
-                rows.append((ln["id"], da, ca, ln["debit_partner_id"], *common, a, 0, desc, 0))
-            if ca and a:
-                rows.append((ln["id"], ca, da, ln["credit_partner_id"], *common, 0, a, desc, 0))
+            # biến động SỐ LƯỢNG hàng tồn kho phải lên sổ kể cả khi thành tiền (đơn giá tạm) bằng 0, chờ tính giá xuất kho
+            has_qty = bool(ln["item_id"]) and to_decimal(ln["quantity"]) != 0
+            if da and (a or has_qty):
+                rows.append((ln["id"], da, ca, ln["debit_partner_id"], *common, a, 0, desc, 0, "D"))
+            if ca and (a or has_qty):
+                rows.append((ln["id"], ca, da, ln["credit_partner_id"], *common, 0, a, desc, 0, "C"))
             t = int(ln["tax_amount"] or 0) if vt.tax_account else 0
             if t:
                 tdesc = f"Thuế GTGT – {desc or ''}".strip(" –")
                 nil = (None, None, None, ln["project_id"], ln["department_id"], None)
                 if vt.tax_side == "D":
-                    rows.append((ln["id"], vt.tax_account, ca, None, *nil, t, 0, tdesc, 1))
-                    rows.append((ln["id"], ca, vt.tax_account, ln["credit_partner_id"], *nil, 0, t, tdesc, 1))
+                    rows.append((ln["id"], vt.tax_account, ca, None, *nil, t, 0, tdesc, 1, "D"))
+                    rows.append((ln["id"], ca, vt.tax_account, ln["credit_partner_id"], *nil, 0, t, tdesc, 1, "C"))
                 else:
-                    rows.append((ln["id"], da, vt.tax_account, ln["debit_partner_id"], *nil, t, 0, tdesc, 1))
-                    rows.append((ln["id"], vt.tax_account, da, None, *nil, 0, t, tdesc, 1))
+                    rows.append((ln["id"], da, vt.tax_account, ln["debit_partner_id"], *nil, t, 0, tdesc, 1, "D"))
+                    rows.append((ln["id"], vt.tax_account, da, None, *nil, 0, t, tdesc, 1, "C"))
         return rows
 
     def post(self, voucher_id: int, skip_check_status: bool = False) -> list[Issue]:
@@ -418,7 +420,7 @@ class VoucherService:
         for r in self.ledger_rows(v):
             self.db.execute("""INSERT INTO ledger_entry(company_id, voucher_id, posting_date, line_id, account_code,
                 contra_account, partner_id, item_id, warehouse_id, quantity, project_id, department_id, expense_item_id,
-                debit, credit, description, is_tax) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                debit, credit, description, is_tax, side) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                             (self.s.company_id, voucher_id, v["posting_date"], *r))
         d = self.db.one("SELECT COALESCE(SUM(debit),0) d, COALESCE(SUM(credit),0) c FROM ledger_entry WHERE voucher_id=?",
                         (voucher_id,))

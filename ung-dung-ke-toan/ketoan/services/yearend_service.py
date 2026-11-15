@@ -57,7 +57,7 @@ class YearEndService:
         for m in inv.movements(f"{year}-01-01", f"{year}-12-31"):
             k = (m["item_id"], m["warehouse_id"])
             q = to_decimal(m["quantity"])
-            if m["debit"]:
+            if m["is_in"]:
                 end[k][0] += q; end[k][1] += m["debit"]
             else:
                 end[k][0] -= q; end[k][1] -= m["credit"]

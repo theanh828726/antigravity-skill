@@ -102,12 +102,13 @@ class InventoryService:
         if warehouse_id:
             cond.append("e.warehouse_id=?")
             params.append(warehouse_id)
-        return self.db.query(f"""
-            SELECT e.id, e.voucher_id, e.line_id, e.posting_date, e.item_id, e.warehouse_id, e.quantity, e.debit, e.credit,
+        rows = self.db.query(f"""
+            SELECT e.id, e.voucher_id, e.line_id, e.posting_date, e.item_id, e.warehouse_id, e.quantity, e.debit, e.credit, e.side,
                    e.account_code, e.contra_account, e.description, v.number, v.vtype, v.voucher_date
             FROM ledger_entry e JOIN voucher v ON v.id=e.voucher_id
             WHERE {' AND '.join(cond)}
-            ORDER BY e.posting_date, (e.debit=0), e.id""", params)
+            ORDER BY e.posting_date, (e.side='C'), e.id""", params)
+        return [{**dict(r), "is_in": r["side"] == "D"} for r in rows]
 
     def opening(self, d_from, item_id=None, warehouse_id=None) -> dict:
         """Tồn đầu ngày d_from theo (hàng, kho): {key: [qty, value]}."""
@@ -130,7 +131,7 @@ class InventoryService:
             for m in self.movements(start, prev, item_id, warehouse_id):
                 k = (m["item_id"], m["warehouse_id"])
                 q = to_decimal(m["quantity"])
-                if m["debit"]:
+                if m["is_in"]:
                     res[k][0] += q; res[k][1] += m["debit"]
                 else:
                     res[k][0] -= q; res[k][1] -= m["credit"]
@@ -153,7 +154,7 @@ class InventoryService:
         for m in self.movements(d_from, d_to, warehouse_id=warehouse_id):
             r = row((m["item_id"], m["warehouse_id"]))
             q = to_decimal(m["quantity"])
-            if m["debit"]:
+            if m["is_in"]:
                 r.in_q += q; r.in_v += m["debit"]
             else:
                 r.out_q += q; r.out_v += m["credit"]
@@ -170,12 +171,12 @@ class InventoryService:
         q, val, rows = oq, ov, []
         for m in self.movements(d_from, d_to, item_id, warehouse_id):
             mq = to_decimal(m["quantity"])
-            if m["debit"]:
+            if m["is_in"]:
                 q += mq; val += m["debit"]
             else:
                 q -= mq; val -= m["credit"]
             d = dict(m)
-            d.update(in_q=mq if m["debit"] else ZERO, out_q=ZERO if m["debit"] else mq, bal_q=q, bal_v=val)
+            d.update(in_q=mq if m["is_in"] else ZERO, out_q=ZERO if m["is_in"] else mq, bal_q=q, bal_v=val)
             rows.append(d)
         return {"opening_q": oq, "opening_v": ov, "rows": rows, "closing_q": q, "closing_v": val}
 
@@ -291,10 +292,10 @@ class InventoryService:
             ob_q, ob_v = opening.get(k, [ZERO, 0])
             label = f"{items[k[0]]['code'] if k[0] in items else '?'} / {whs[k[1]]['code'] if k[1] in whs else '(chưa chọn kho)'}"
             evs = events.get(k, [])
-            ins = [e for e in evs if e["debit"]]
+            ins = [e for e in evs if e["is_in"]]
             outs = []
             for e in evs:
-                if e["debit"]:
+                if e["is_in"]:
                     continue
                 if e["contra_account"] and e["contra_account"].startswith(INVENTORY_PREFIXES):
                     res.warnings.append(f"{label}: {e['number']} là chuyển kho/điều chỉnh nội bộ TK kho – giữ nguyên giá trị.")
@@ -305,13 +306,13 @@ class InventoryService:
                     continue
                 outs.append(e)
             out_ids = {e["id"] for e in outs}
-            fixed_out = [e for e in evs if not e["debit"] and e["id"] not in out_ids]
+            fixed_out = [e for e in evs if not e["is_in"] and e["id"] not in out_ids]
             new_amounts = (self._bqck if method == "BQCK" else self._fifo)(k, label, ob_q, ob_v, ins, outs, fixed_out, res)
             in_q = sum((to_decimal(e["quantity"]) for e in ins), ZERO)
             in_v = sum(e["debit"] for e in ins)
-            out_q = sum((to_decimal(e["quantity"]) for e in evs if not e["debit"]), ZERO)
-            old_out_v = sum(e["credit"] for e in evs if not e["debit"])
-            new_out_v = sum(new_amounts.get(e["id"], e["credit"]) for e in evs if not e["debit"])
+            out_q = sum((to_decimal(e["quantity"]) for e in evs if not e["is_in"]), ZERO)
+            old_out_v = sum(e["credit"] for e in evs if not e["is_in"])
+            new_out_v = sum(new_amounts.get(e["id"], e["credit"]) for e in evs if not e["is_in"])
             for e in outs:
                 amt = new_amounts.get(e["id"], e["credit"])
                 q = to_decimal(e["quantity"])
@@ -376,12 +377,12 @@ class InventoryService:
     def _fifo(self, k, label, ob_q, ob_v, ins, outs, fixed_out, res) -> dict:
         new = {}
         layers: list[list] = [[ob_q, ob_v]] if ob_q > 0 else []
-        events = sorted(ins + outs + fixed_out, key=lambda e: (e["posting_date"], 0 if e["debit"] else 1, e["id"]))
+        events = sorted(ins + outs + fixed_out, key=lambda e: (e["posting_date"], 0 if e["is_in"] else 1, e["id"]))
         out_ids = {e["id"] for e in outs}
         last_unit = (to_decimal(ob_v) / ob_q) if ob_q > 0 else None
         for e in events:
             qq = to_decimal(e["quantity"])
-            if e["debit"]:
+            if e["is_in"]:
                 layers.append([qq, e["debit"]])
                 if qq:
                     last_unit = to_decimal(e["debit"]) / qq

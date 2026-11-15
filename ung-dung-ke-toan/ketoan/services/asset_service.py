@@ -83,9 +83,10 @@ class _RunMixin:
         if self.db.scalar("SELECT 1 FROM period_run WHERE company_id=? AND kind=? AND year=? AND month=?",
                           (self.s.company_id, self.kind, year, month)):
             raise BusinessError(f"Tháng {month:02d}/{year} đã chạy. Hoàn tác trước nếu cần chạy lại.")
-        if month > 1 and not self.db.scalar("SELECT 1 FROM period_run WHERE company_id=? AND kind=? AND year=? AND month=?",
-                                            (self.s.company_id, self.kind, year, month - 1)):
-            raise BusinessError(f"Chưa chạy tháng {month - 1:02d}/{year} – phải chạy tuần tự từng tháng.")
+        for k in range(1, month):        # phải chạy tuần tự; tháng chưa có khoản nào phát sinh thì được bỏ qua
+            if not self.db.scalar("SELECT 1 FROM period_run WHERE company_id=? AND kind=? AND year=? AND month=?",
+                                  (self.s.company_id, self.kind, year, k)) and any(r.amount for r in self.preview(year, k)):
+                raise BusinessError(f"Chưa chạy tháng {k:02d}/{year} – phải chạy tuần tự từng tháng.")
         if self.periods.is_locked(f"{year}-{month:02d}-01"):
             raise BusinessError(f"Tháng {month:02d}/{year} đã khóa.")
 
@@ -174,7 +175,7 @@ class AssetService(_RunMixin):
         for a in self.db.query("SELECT * FROM fixed_asset WHERE company_id=? AND active=1 ORDER BY code", (self.s.company_id,)):
             if not a["start_date"] or not a["useful_months"] or a["start_date"][:7] > ym_end[:7]:
                 continue
-            if a["disposal_date"] and a["disposal_date"][:7] <= ym_end[:7]:
+            if a["disposal_date"] and a["disposal_date"][:7] < ym_end[:7]:
                 continue                                           # ngừng từ tháng sau tháng ghi giảm
             done = a["accumulated_opening"] + self._done_before(a["id"], year, month)
             remain = a["original_cost"] - done
