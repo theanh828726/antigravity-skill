@@ -102,7 +102,7 @@ ung-dung-ke-toan/
 │   │   └── system_service.py     # doanh nghiệp, chế độ KT, số dư đầu, sao lưu, nhật ký
 │   ├── reports/export.py         # Excel / PDF / in
 │   └── ui/                       # PySide6 – chỉ gọi services, không viết SQL
-├── tests/                        # 95 lượt kiểm thử khi có PostgreSQL (52 trên SQLite + 43 trên PostgreSQL, gồm 6 bài đa người dùng chạy song song nhiều kết nối): nghiệp vụ GĐ1–GĐ4 + giao diện offscreen
+├── tests/                        # 95 lượt kiểm thử khi có PostgreSQL (53 trên SQLite + 42 trên PostgreSQL, gồm 6 bài đa người dùng chạy song song nhiều kết nối): nghiệp vụ GĐ1–GĐ4 + giao diện offscreen
 ├── sample_data/                  # ketoan_demo.db + hoa_don_xml/ (4 hóa đơn XML mẫu)
 ├── packaging/                    # PyInstaller spec, build_windows.bat, Inno Setup
 └── docs/                         # hướng dẫn cài đặt, kết quả kiểm tra, ảnh màn hình

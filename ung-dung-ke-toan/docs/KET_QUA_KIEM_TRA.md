@@ -4,7 +4,7 @@ Ngày kiểm tra: 14/11/2026 · Python 3.13 · PySide6 6.12 · SQLite · giao di
 
 ```
 $ QT_QPA_PLATFORM=offscreen python -m pytest -v tests
-95 passed   (52 bài trên SQLite + 43 lượt trên PostgreSQL 16, gồm 6 bài đa người dùng)
+95 passed   (53 bài trên SQLite + 42 lượt trên PostgreSQL 16, gồm 6 bài đa người dùng)
 ```
 
 ## 1. Dữ liệu minh họa (`sample_data/ketoan_demo.db`)
