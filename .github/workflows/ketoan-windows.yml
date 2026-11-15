@@ -1,0 +1,78 @@
+name: Ung dung Ke toan - kiem thu va dong goi Windows
+
+on:
+  push:
+    paths:
+      - "ung-dung-ke-toan/**"
+      - ".github/workflows/ketoan-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: ung-dung-ke-toan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Thu vien he thong cho Qt offscreen
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - run: pip install -r requirements.txt pytest
+      - name: Kiem thu nghiep vu + giao dien (SQLite va PostgreSQL, gom da nguoi dung)
+        env:
+          QT_QPA_PLATFORM: offscreen
+          KETOAN_PG_TEST_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: python -m pytest -q tests
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ung-dung-ke-toan
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pyinstaller pytest
+      - name: Kiem thu tren Windows
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q tests
+      - name: Dong goi PyInstaller
+        run: pyinstaller --noconfirm packaging/ketoan.spec
+      - name: Kem du lieu mau va huong dan
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/UngDungKeToan/sample_data | Out-Null
+          python -c "from ketoan.data.seed import create_database; create_database(r'dist/UngDungKeToan/sample_data/ketoan_demo.db').close()"
+          Copy-Item docs/HUONG_DAN_CAI_DAT.md dist/UngDungKeToan/
+          Copy-Item -Recurse sample_data/hoa_don_xml dist/UngDungKeToan/sample_data/
+      - name: Kiem tra exe khoi dong duoc (tu thoat sau 8 giay)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/UngDungKeToan/UngDungKeToan.exe -ArgumentList "--db","dist/UngDungKeToan/sample_data/ketoan_demo.db","--user","admin","--password","admin@123" -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) { Write-Error "Ung dung thoat som, ma loi $($p.ExitCode)"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "Ung dung khoi dong thanh cong"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UngDungKeToan-windows
+          path: ung-dung-ke-toan/dist/UngDungKeToan
+          retention-days: 30

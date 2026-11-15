@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon Id="data"><TTChung><PBan>2.0.0</PBan><THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon><KHMSHDon>1</KHMSHDon>
+<KHHDon>1C26TXX</KHHDon><SHDon>0000001</SHDon><NLap>2026-11-01</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung>
+<NDHDon><NBan><Ten>Công ty A (minh họa)</Ten><MST>0100000011</MST><DChi>Hà Nội</DChi></NBan>
+<NMua><Ten>Công ty B (minh họa)</Ten><MST>0100000022</MST><DChi>Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><MHHDVu>X</MHHDVu><THHDVu>Hàng hóa X</THHDVu>
+<DVTinh>Cái</DVTinh><SLuong>1</SLuong><DGia>1000000</DGia><ThTien>1000000</ThTien>
+<TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>1000000</TgTCThue><TgTThue>100000</TgTThue><TgTTTBSo>1100000</TgTTTBSo></TToan></NDHDon></DLHDon>
+<DSCKS><NBan>(chữ ký số – không kiểm tra trong ứng dụng)</NBan></DSCKS></HDon>

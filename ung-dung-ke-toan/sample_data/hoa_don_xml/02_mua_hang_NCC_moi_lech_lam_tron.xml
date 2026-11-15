@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HDon><DLHDon Id="data"><TTChung><PBan>2.0.0</PBan><THDon>HÓA ĐƠN GIÁ TRỊ GIA TĂNG</THDon><KHMSHDon>1</KHMSHDon>
+<KHHDon>1C26THS</KHHDon><SHDon>0000057</SHDon><NLap>2026-11-12</NLap><DVTTe>VND</DVTTe><TGia>1</TGia></TTChung>
+<NDHDon><NBan><Ten>Công ty TNHH Văn phòng phẩm Hoa Sen (minh họa)</Ten><MST>0109990401</MST><DChi>Số 5 phố Minh Họa, Hà Nội</DChi></NBan>
+<NMua><Ten>Công ty TNHH Thương mại – Dịch vụ Minh Khang (minh họa)</Ten><MST>0109990001</MST><DChi>Số 18 phố Minh Họa, quận Cầu Giấy, Hà Nội</DChi></NMua>
+<DSHHDVu><HHDVu><TChat>1</TChat><STT>1</STT><MHHDVu>VPP01</MHHDVu><THHDVu>Bìa hồ sơ nhựa</THHDVu>
+<DVTinh>Cái</DVTinh><SLuong>1</SLuong><DGia>12345</DGia><ThTien>12345</ThTien>
+<TSuat>10%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>2</STT><MHHDVu>VPP02</MHHDVu><THHDVu>Bút bi xanh</THHDVu>
+<DVTinh>Hộp</DVTinh><SLuong>1</SLuong><DGia>23455</DGia><ThTien>23455</ThTien>
+<TSuat>10%</TSuat></HHDVu><HHDVu><TChat>1</TChat><STT>3</STT><MHHDVu>VPP03</MHHDVu><THHDVu>Kẹp giấy</THHDVu>
+<DVTinh>Hộp</DVTinh><SLuong>1</SLuong><DGia>34565</DGia><ThTien>34565</ThTien>
+<TSuat>10%</TSuat></HHDVu></DSHHDVu>
+<TToan><TgTCThue>70365</TgTCThue><TgTThue>7037</TgTThue><TgTTTBSo>77402</TgTTTBSo></TToan></NDHDon></DLHDon>
+<DSCKS><NBan>(chữ ký số – không kiểm tra trong ứng dụng)</NBan></DSCKS></HDon>
